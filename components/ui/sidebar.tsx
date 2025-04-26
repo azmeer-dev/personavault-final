@@ -603,20 +603,22 @@ function SidebarMenuSkeleton({
   className,
   showIcon = false,
   ...props
-}: React.ComponentProps<"div"> & {
-  showIcon?: boolean
-}) {
-  // Random width between 50 to 90%.
-  const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`
+}: React.ComponentProps<"div"> & { showIcon?: boolean }) {
+  // start with a fixed width on the server
+  const [width, setWidth] = React.useState("75%")
+
+  // once on the client, pick a random width
+  React.useEffect(() => {
+    const w = Math.floor(Math.random() * 40) + 50
+    setWidth(`${w}%`)
   }, [])
 
   return (
     <div
-      data-slot="sidebar-menu-skeleton"
-      data-sidebar="menu-skeleton"
-      className={cn("flex h-8 items-center gap-2 rounded-md px-2", className)}
       {...props}
+      // suppress hydration warnings on this container
+      suppressHydrationWarning
+      className={`${className} flex h-8 items-center gap-2 rounded-md px-2`}
     >
       {showIcon && (
         <Skeleton
@@ -625,13 +627,10 @@ function SidebarMenuSkeleton({
         />
       )}
       <Skeleton
-        className="h-4 max-w-(--skeleton-width) flex-1"
+        className="h-4 max-w-[var(--skeleton-width)] flex-1"
         data-sidebar="menu-skeleton-text"
-        style={
-          {
-            "--skeleton-width": width,
-          } as React.CSSProperties
-        }
+        // apply the (now stable) width
+        style={{ "--skeleton-width": width } as React.CSSProperties}
       />
     </div>
   )

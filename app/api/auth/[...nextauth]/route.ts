@@ -20,7 +20,7 @@ export const authOptions: NextAuthOptions = {
 
   // Custom sign-in page
   pages: {
-    signIn: "/login",
+    signIn: "/signin",
   },
 
   providers: [
@@ -107,11 +107,6 @@ export const authOptions: NextAuthOptions = {
         });
       }
       return true;
-    },
-
-    // redirect after sign-in
-    async redirect() {
-      return "/dashboard";
     },
   },
 
