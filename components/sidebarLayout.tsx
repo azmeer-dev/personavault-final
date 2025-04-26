@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { ModeToggle } from "./mode-toggle";
 
 export default function SidebarLayout({
   children,
@@ -33,8 +34,13 @@ export default function SidebarLayout({
   return (
     <SidebarProvider open={open} onOpenChange={setOpen}>
       <AppSidebar />
-      <div className="p-1">
-        <SidebarTrigger />
+      <div className="pt-2 flex-col">
+        <div>
+          <ModeToggle />
+        </div>
+        <div>
+          <SidebarTrigger />
+        </div>
       </div>
       <main className="flex-1 overflow-y-auto">{children}</main>
     </SidebarProvider>

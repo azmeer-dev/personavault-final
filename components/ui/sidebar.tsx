@@ -17,7 +17,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
   TooltipContent,
@@ -600,40 +599,27 @@ function SidebarMenuBadge({
 }
 
 function SidebarMenuSkeleton({
-  className,
+  className = "",
   showIcon = false,
   ...props
 }: React.ComponentProps<"div"> & { showIcon?: boolean }) {
-  // start with a fixed width on the server
-  const [width, setWidth] = React.useState("75%")
-
-  // once on the client, pick a random width
-  React.useEffect(() => {
-    const w = Math.floor(Math.random() * 40) + 50
-    setWidth(`${w}%`)
-  }, [])
-
   return (
     <div
       {...props}
-      // suppress hydration warnings on this container
-      suppressHydrationWarning
-      className={`${className} flex h-8 items-center gap-2 rounded-md px-2`}
+      className={`${className} flex h-8 items-center gap-2 rounded-md px-2 animate-pulse`}
     >
       {showIcon && (
-        <Skeleton
-          className="size-4 rounded-md"
+        <div
+          className="h-6 w-6 rounded-md bg-muted"
           data-sidebar="menu-skeleton-icon"
         />
       )}
-      <Skeleton
-        className="h-4 max-w-[var(--skeleton-width)] flex-1"
+      <div
+        className="h-4 flex-1 rounded bg-muted"
         data-sidebar="menu-skeleton-text"
-        // apply the (now stable) width
-        style={{ "--skeleton-width": width } as React.CSSProperties}
       />
     </div>
-  )
+  );
 }
 
 function SidebarMenuSub({ className, ...props }: React.ComponentProps<"ul">) {

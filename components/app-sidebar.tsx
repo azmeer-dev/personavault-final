@@ -1,25 +1,34 @@
-// app/components/AppSidebar.tsx
+// components/AppSidebar.tsx
 "use client";
 
 import * as React from "react";
 import Link from "next/link";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import {
   Sidebar,
-  SidebarContent,
-  SidebarGroup,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
+  SidebarContent,
+  SidebarFooter,
+  SidebarRail,
   SidebarMenuSkeleton,
 } from "@/components/ui/sidebar";
-import { ModeToggle } from "./mode-toggle";
+import { NavMain, NavMainItem } from "@/components/nav-main";
+import { NavProjects, NavProject } from "@/components/nav-projects";
+import { NavUser } from "@/components/nav-user";
 
+import {
+  Home as HomeIcon,
+  BookOpen as DocIcon,
+  LayoutDashboardIcon as DashboardIcon,
+  Code as CodeIcon,
+  CheckCircle as CheckIcon,
+  FileText as FileIcon,
+  Fingerprint,
+  Link as LinkIcon,
+} from "lucide-react";
+
+// ─── your original data ───
 const navDataNoUser = {
   main: [
     { title: "Home", url: "/" },
@@ -28,22 +37,13 @@ const navDataNoUser = {
       url: "#",
       items: [
         { title: "Routing", url: "#" },
-        { title: "Data Fetching", url: "#", isActive: true },
+        { title: "Data Fetching", url: "#" },
         { title: "Rendering", url: "#" },
-        { title: "Caching", url: "#" },
-        { title: "Styling", url: "#" },
-        { title: "Optimizing", url: "#" },
-        { title: "Configuring", url: "#" },
-        { title: "Testing", url: "#" },
-        { title: "Authentication", url: "#" },
-        { title: "Deploying", url: "#" },
-        { title: "Upgrading", url: "#" },
-        { title: "Examples", url: "#" },
+        // …etc
       ],
     },
   ],
 };
-
 const navDataUser = {
   main: [
     { title: "Dashboard", url: "/dashboard" },
@@ -54,6 +54,7 @@ const navDataUser = {
     { title: "Audit Logs", url: "/audit" },
   ],
 };
+// ─────────────────────────────
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const { data: session, status } = useSession();
@@ -63,105 +64,78 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     return <SidebarMenuSkeleton suppressHydrationWarning />;
   }
 
-  const navData = session?.user ? navDataUser : navDataNoUser;
-  const userLabel =
-    session?.user?.name ?? session?.user?.email?.split("@")[0] ?? null;
+  const isUser = Boolean(session?.user);
+  const navData = isUser ? navDataUser : navDataNoUser;
+
+  // map titles to icons
+  const iconMap: Record<string, React.ComponentType<any>> = {
+    Home: HomeIcon,
+    "Building Your Application": DocIcon,
+    "Dashboard": DashboardIcon,
+    "Linked Accounts": LinkIcon,
+    "Identities": Fingerprint,
+    "API Clients": CodeIcon,
+    "Pending Consents": CheckIcon,
+    "Audit Logs": FileIcon,
+  };
+
+  // Map your old data into NavMain shape
+  const mainItems: NavMainItem[] = navData.main.map((item) => ({
+    title: item.title,
+    url: item.url,
+    icon: iconMap[item.title] || HomeIcon,
+    isActive:
+      pathname === item.url || pathname.startsWith(item.url + "/"),
+    items: item.items,
+  }));
+
+  // placeholder projects
+  const projectItems: NavProject[] = [];
 
   return (
     <Sidebar
+      collapsible="icon"
       variant="floating"
+      className="transition-[width] ease-linear"
       {...props}
     >
-      {/* ───────── Brand ───────── */}
-      <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <Link href="/">
-                <span className="font-medium text-lg leading-none">
-                  PersonaVault
-                </span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+      {/* Header */}
+      <SidebarHeader className="group-data-[collapsible=icon]:hidden">
+        <Link href="/" className="font-bold px-4 py-2 block">
+          PersonaVault
+        </Link>
       </SidebarHeader>
 
-      {/* ───────── Navigation ───────── */}
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarMenu className="gap-2">
-            {navData.main.map((item) => {
-              const parentActive =
-                pathname === item.url ||
-                pathname.startsWith(item.url + "/");
-
-              return (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={parentActive}
-                  >
-                    <Link href={item.url} className="font-medium">
-                      {item.title}
-                    </Link>
-                  </SidebarMenuButton>
-
-                  {item.items?.length ? (
-                    <SidebarMenuSub className="ml-0 border-l-0 px-1.5">
-                      {item.items.map((sub) => (
-                        <SidebarMenuSubItem key={sub.title}>
-                          <SidebarMenuSubButton
-                            asChild
-                            isActive={pathname === sub.url}
-                          >
-                            <Link href={sub.url}>{sub.title}</Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-                    </SidebarMenuSub>
-                  ) : null}
-                </SidebarMenuItem>
-              );
-            })}
-          </SidebarMenu>
-        </SidebarGroup>
+      {/* Navigation */}
+      <SidebarContent className="flex-1">
+        <NavMain items={mainItems} />
+        {projectItems.length > 0 && <NavProjects projects={projectItems} />}
       </SidebarContent>
 
-      {/* ───────── Footer controls ───────── */}
-      <div className="p-2 flex items-center">
-        <ModeToggle />
-        <div className="ml-auto flex items-center gap-2">
-          {session?.user ? (
-            <>
-              {userLabel && (
-                <Link
-                  href="/settings"
-                  className="p-2 hover:underline cursor-pointer"
-                  title={userLabel}
-                >
-                  {userLabel}
-                </Link>
-              )}
-              <button
-                onClick={() => signOut()}
-                className="p-2 hover:underline cursor-pointer"
-              >
-                Sign Out
-              </button>
-            </>
-          ) : (
-            <>
-              <Link href="/signup" className="p-2 hover:underline">
-                Sign Up
-              </Link>
-              <Link href="/signin" className="p-2 hover:underline">
-                Sign In
-              </Link>
-            </>
-          )}
-        </div>
-      </div>
+      {/* Footer */}
+      <SidebarFooter>
+        {isUser ? (
+          <NavUser />
+        ) : (
+          <div className="px-4 py-2 border-t flex items-center gap-2">
+            <Link
+              href="/signup"
+              className="flex-1 text-sm text-center hover:underline"
+            >
+              Sign Up
+            </Link>
+            <Link
+              href="/signin"
+              className="text-sm hover:underline whitespace-nowrap"
+            >
+              Sign In
+            </Link>
+          </div>
+        )}
+      </SidebarFooter>
+
+      {/* Collapse rail */}
+      <SidebarRail />
     </Sidebar>
   );
 }
