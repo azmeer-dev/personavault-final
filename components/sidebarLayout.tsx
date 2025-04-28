@@ -2,16 +2,20 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { ModeToggle } from "./mode-toggle";
+import { ModeToggle } from "@/components/mode-toggle";
+
+interface SidebarLayoutProps {
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}
 
 export default function SidebarLayout({
   children,
-}: {
-  children: React.ReactNode;
-}) {
-  // Lazy-init from localStorage so initial mount already matches persisted state
+  defaultOpen = true,
+}: SidebarLayoutProps) {
+  // lazy-init from localStorage so initial mount already matches persisted state
   const [open, setOpen] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
       const stored = window.localStorage.getItem("sidebarOpen");
@@ -21,7 +25,8 @@ export default function SidebarLayout({
         } catch {}
       }
     }
-    return true;
+    // if provided via props, use that as the fallback initial value
+    return defaultOpen;
   });
 
   // Persist on every change
@@ -37,9 +42,6 @@ export default function SidebarLayout({
       <div className="pt-2 flex-col">
         <div>
           <ModeToggle />
-        </div>
-        <div>
-          <SidebarTrigger />
         </div>
       </div>
       <main className="flex-1 overflow-y-auto">{children}</main>

@@ -19,7 +19,7 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { Bell, ChevronsUpDown, LogOut } from "lucide-react";
+import { Bell, ChevronsUpDown, LogOut, LogIn as LoginIcon } from "lucide-react";
 
 export function NavUser() {
   const { data: session } = useSession();
@@ -66,12 +66,17 @@ export function NavUser() {
               <>
                 <DropdownMenuGroup>
                   <DropdownMenuItem asChild>
-                    <Link href="/signin">Sign In</Link>
+                    <Link href="/signup">
+                      <Bell className="mr-2" /> Sign Up
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/signup">Sign Up</Link>
+                    <Link href="/signin">
+                      <LoginIcon className="mr-2"/>Sign In
+                    </Link>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
+
               </>
             )}
 
@@ -86,7 +91,7 @@ export function NavUser() {
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => signOut()}>
+                <DropdownMenuItem onClick={() => signOut({callbackUrl: "/signin"})}>
                   <LogOut className="mr-2" /> Sign Out
                 </DropdownMenuItem>
               </>

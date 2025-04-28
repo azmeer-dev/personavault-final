@@ -73,10 +73,24 @@ export default function LoginPage() {
   };
 
   /* Google OAuth */
-  const handleGoogle = () => {
-    setOauthLoading(true);
-    signIn("google", { callbackUrl: "/dashboard" });
-  };
+  const handleGoogle = async () => {
+  setOauthLoading(true);
+
+  // Ask NextAuth to return a URL instead of redirecting
+  const res = await signIn("google", {
+    redirect: false,
+    callbackUrl: "/dashboard",
+  });
+
+  setOauthLoading(false);
+
+  if (res?.url) {
+    // show the toast immediately
+    toast.success("Signed in — welcome back!");
+    router.push(res.url);
+  } else {
+  }
+};
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-950 px-4">

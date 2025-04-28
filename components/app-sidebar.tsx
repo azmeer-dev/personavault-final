@@ -19,39 +19,29 @@ import { NavUser } from "@/components/nav-user";
 
 import {
   Home as HomeIcon,
-  BookOpen as DocIcon,
   LayoutDashboardIcon as DashboardIcon,
   Code as CodeIcon,
   CheckCircle as CheckIcon,
   FileText as FileIcon,
   Fingerprint,
   Link as LinkIcon,
+  LucideIcon,
 } from "lucide-react";
 
-// ─── your original data ───
 const navDataNoUser = {
   main: [
-    { title: "Home", url: "/" },
-    {
-      title: "Building Your Application",
-      url: "#",
-      items: [
-        { title: "Routing", url: "#" },
-        { title: "Data Fetching", url: "#" },
-        { title: "Rendering", url: "#" },
-        // …etc
-      ],
-    },
+    { title: "Home", url: "/", items: [], },
   ],
 };
 const navDataUser = {
   main: [
-    { title: "Dashboard", url: "/dashboard" },
-    { title: "Linked Accounts", url: "/linkedAccounts" },
-    { title: "Identities", url: "/identities" },
-    { title: "API Clients", url: "/apiClients" },
-    { title: "Pending Consents", url: "/consent" },
-    { title: "Audit Logs", url: "/audit" },
+    // { title: "Home", url: "/" },
+    { title: "Dashboard", url: "/dashboard", items: [], },
+    { title: "Linked Accounts", url: "/connected-accounts", items: [], },
+    { title: "Identities", url: "/identities", items: [], },
+    { title: "API Clients", url: "/apiClients", items: [], },
+    { title: "Pending Consents", url: "/consent", items: [], },
+    { title: "Audit Logs", url: "/audit", items: [], },
   ],
 };
 // ─────────────────────────────
@@ -68,15 +58,15 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const navData = isUser ? navDataUser : navDataNoUser;
 
   // map titles to icons
-  const iconMap: Record<string, React.ComponentType<any>> = {
+  const iconMap: Record<string, LucideIcon> = {
     Home: HomeIcon,
-    "Building Your Application": DocIcon,
-    "Dashboard": DashboardIcon,
+    Dashboard: DashboardIcon,
     "Linked Accounts": LinkIcon,
-    "Identities": Fingerprint,
+    Identities: Fingerprint,
     "API Clients": CodeIcon,
     "Pending Consents": CheckIcon,
     "Audit Logs": FileIcon,
+    Test: HomeIcon,
   };
 
   // Map your old data into NavMain shape
@@ -84,8 +74,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     title: item.title,
     url: item.url,
     icon: iconMap[item.title] || HomeIcon,
-    isActive:
-      pathname === item.url || pathname.startsWith(item.url + "/"),
+    isActive: pathname === item.url || pathname.startsWith(item.url + "/"),
     items: item.items,
   }));
 
@@ -114,24 +103,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 
       {/* Footer */}
       <SidebarFooter>
-        {isUser ? (
-          <NavUser />
-        ) : (
-          <div className="px-4 py-2 border-t flex items-center gap-2">
-            <Link
-              href="/signup"
-              className="flex-1 text-sm text-center hover:underline"
-            >
-              Sign Up
-            </Link>
-            <Link
-              href="/signin"
-              className="text-sm hover:underline whitespace-nowrap"
-            >
-              Sign In
-            </Link>
-          </div>
-        )}
+        <NavUser />
       </SidebarFooter>
 
       {/* Collapse rail */}
