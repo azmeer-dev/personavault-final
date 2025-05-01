@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
-import type { Account } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,11 +25,15 @@ import { Separator } from "@/components/ui/separator";
 
 import ConnectAccountButtons from "@/components/ConnectAccountButtons";
 
-// Define the exact shape of the rows you’re fetching
-type LinkedAccount = Pick<
-  Account,
-  "id" | "provider" | "providerAccountId" | "email"
->;
+// ————————————————————————————————————————————————
+// Manually declare the exact shape we're selecting
+// ————————————————————————————————————————————————
+type LinkedAccount = {
+  id: string;
+  provider: string;
+  providerAccountId: string;
+  email: string | null;
+};
 
 // ─── Server Action ─────────────────────────────────────────────
 async function unlinkAccount(formData: FormData) {
@@ -51,7 +54,7 @@ export default async function ConnectedAccountsPage() {
   if (!session?.user?.id) redirect("/signin");
   const userId = session.user.id;
 
-  // 👇 now typed as LinkedAccount[], so acc won’t be `any`
+  // typed as LinkedAccount[], so `acc` is never `any`
   const linked: LinkedAccount[] = await prisma.account.findMany({
     where: { userId },
     select: {
