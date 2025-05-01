@@ -97,7 +97,7 @@ export default async function ConnectedAccountsPage() {
                     <TableCell>{acc.providerAccountId}</TableCell>
                     <TableCell>{acc.email}</TableCell>
                     <TableCell className="text-right">
-                      <form action={unlinkAccount} method="post">
+                      <form action={unlinkAccount}>
                         <input
                           type="hidden"
                           name="accountId"
