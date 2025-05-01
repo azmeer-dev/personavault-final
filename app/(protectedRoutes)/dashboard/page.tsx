@@ -112,7 +112,7 @@ export default function DashboardPage() {
           data && (
             <>
               <StatCard
-                title="Linked Accounts"
+                title="Connected Accounts"
                 value={data.accounts}
                 href="/connected-accounts"
               />

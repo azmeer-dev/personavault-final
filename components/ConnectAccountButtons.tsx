@@ -13,8 +13,11 @@ export default function ConnectAccountButtons({ providers }: Props) {
     <div className="flex flex-col gap-4">
       {providers.map((provider) => (
         <Button
+          className="cursor-pointer"
           key={provider}
-          onClick={() => signIn(provider, { callbackUrl: "/connected-accounts" })}
+          onClick={() =>
+            signIn(provider, { callbackUrl: "/connected-accounts" })
+          }
         >
           Connect {provider.charAt(0).toUpperCase() + provider.slice(1)}
         </Button>
@@ -22,3 +25,5 @@ export default function ConnectAccountButtons({ providers }: Props) {
     </div>
   );
 }
+
+

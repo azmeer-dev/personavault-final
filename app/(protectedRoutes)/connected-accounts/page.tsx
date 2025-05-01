@@ -1,6 +1,6 @@
 // app/connected-accounts/page.tsx
-
 import { getServerSession } from "next-auth/next";
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
@@ -28,7 +28,7 @@ import ConnectAccountButtons from "@/components/ConnectAccountButtons";
 async function unlinkAccount(formData: FormData) {
   "use server";
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return;
+  if (!session?.user?.id) redirect("/signin");
   const accountId = formData.get("accountId")?.toString();
   if (accountId) {
     await prisma.account.delete({ where: { id: accountId } });
@@ -39,7 +39,7 @@ async function unlinkAccount(formData: FormData) {
 // ─── Page Component ────────────────────────────────────────────
 export default async function ConnectedAccountsPage() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return;
+  if (!session?.user?.id) redirect("/signin");
   const userId = session.user.id;
 
   // 1) fetch linked accounts
@@ -54,10 +54,8 @@ export default async function ConnectedAccountsPage() {
     orderBy: { provider: "asc" },
   });
 
-  // 2) determine missing providers
+  // 2) list all providers so users can connect multiple accounts
   const allProviders = ["google", "github", "linkedin", "twitch"] as const;
-  const linkedSet = new Set(linked.map((a) => a.provider));
-  const missing = allProviders.filter((p) => !linkedSet.has(p));
 
   return (
     <main className="space-y-8 p-6">
@@ -82,12 +80,18 @@ export default async function ConnectedAccountsPage() {
               <TableBody>
                 {linked.map((acc) => (
                   <TableRow key={acc.id}>
-                    <TableCell className="capitalize">{acc.provider}</TableCell>
+                    <TableCell className="capitalize">
+                      {acc.provider}
+                    </TableCell>
                     <TableCell>{acc.providerAccountId}</TableCell>
                     <TableCell>{acc.email}</TableCell>
                     <TableCell className="text-right">
-                      <form action={unlinkAccount}>
-                        <input type="hidden" name="accountId" value={acc.id} />
+                      <form action={unlinkAccount} method="post">
+                        <input
+                          type="hidden"
+                          name="accountId"
+                          value={acc.id}
+                        />
                         <Button variant="destructive" size="sm">
                           Unlink
                         </Button>
@@ -113,13 +117,7 @@ export default async function ConnectedAccountsPage() {
           <CardTitle>Connect a New Account</CardTitle>
         </CardHeader>
         <CardContent>
-          {missing.length > 0 ? (
-            <ConnectAccountButtons providers={missing} />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              All available providers are already connected.
-            </p>
-          )}
+          <ConnectAccountButtons providers={allProviders} />
         </CardContent>
       </Card>
     </main>
