@@ -4,7 +4,7 @@ import "./globals.css";
 
 import { getServerSession } from "next-auth/next";
 import { cookies }          from "next/headers";
-import { authOptions }      from "@/app/api/auth/[...nextauth]/route";
+import { authOptions }      from "@/app/api/auth/[...nextauth]/options";
 import { Providers }        from "./providers";
 import { ThemeProvider }    from "@/components/theme-provider";
 import SidebarLayout        from "@/components/sidebarLayout";
