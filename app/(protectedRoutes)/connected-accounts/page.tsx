@@ -1,9 +1,11 @@
 // app/connected-accounts/page.tsx
+
 import { getServerSession } from "next-auth/next";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import type { Account } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -24,11 +26,18 @@ import { Separator } from "@/components/ui/separator";
 
 import ConnectAccountButtons from "@/components/ConnectAccountButtons";
 
+// Define the exact shape of the rows you’re fetching
+type LinkedAccount = Pick<
+  Account,
+  "id" | "provider" | "providerAccountId" | "email"
+>;
+
 // ─── Server Action ─────────────────────────────────────────────
 async function unlinkAccount(formData: FormData) {
   "use server";
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/signin");
+
   const accountId = formData.get("accountId")?.toString();
   if (accountId) {
     await prisma.account.delete({ where: { id: accountId } });
@@ -42,8 +51,8 @@ export default async function ConnectedAccountsPage() {
   if (!session?.user?.id) redirect("/signin");
   const userId = session.user.id;
 
-  // 1) fetch linked accounts
-  const linked = await prisma.account.findMany({
+  // 👇 now typed as LinkedAccount[], so acc won’t be `any`
+  const linked: LinkedAccount[] = await prisma.account.findMany({
     where: { userId },
     select: {
       id: true,
@@ -54,7 +63,6 @@ export default async function ConnectedAccountsPage() {
     orderBy: { provider: "asc" },
   });
 
-  // 2) list all providers so users can connect multiple accounts
   const allProviders = ["google", "github", "linkedin", "twitch"] as const;
 
   return (
