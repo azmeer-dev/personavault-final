@@ -38,6 +38,7 @@ export default function LoginPage() {
   const handleCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // 1) Validate form
     const result = LoginSchema.safeParse(form);
     if (!result.success) {
       const errs: Partial<Record<keyof FormValues, string>> = {};
@@ -48,33 +49,37 @@ export default function LoginPage() {
       toast.error("Please fix the highlighted fields.");
       return;
     }
-
     setFieldErrors({});
     setLoading(true);
 
-    // show toast immediately
-    toast.success("Signed in — welcome back!");
-
-    // let NextAuth handle the full-page redirect
-    await signIn("credentials", {
-      callbackUrl: "/dashboard",
+    // 2) Attempt signIn without auto-redirect
+    const res = await signIn("credentials", {
+      redirect: false,
+      callbackUrl: `${window.location.origin}/dashboard`,
       email: form.email,
       password: form.password,
     });
 
-    // we don’t call router.push or handle res here
     setLoading(false);
+
+    // 3) On success → hard redirect
+    if (res?.ok && res.url) {
+      toast.success("Signed in — welcome back!");
+      window.location.href = res.url;
+    } else {
+      toast.error(res?.error ?? "Invalid e-mail or password");
+    }
   };
 
   /* Google OAuth */
   const handleGoogle = () => {
     setOauthLoading(true);
-    // show toast immediately
-    toast.success("Signed in — welcome back!");
-    // let NextAuth do the redirect
-    signIn("google", { callbackUrl: "/dashboard" });
-    // no need to await or router.push
-    setOauthLoading(false);
+    // show toast
+    toast.success("Signing you in…");
+    // let NextAuth perform its hard redirect
+    signIn("google", {
+      callbackUrl: `${window.location.origin}/dashboard`,
+    });
   };
 
   return (
