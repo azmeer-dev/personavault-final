@@ -1,7 +1,7 @@
+// app/signin/page.tsx
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { z } from "zod";
 import {
@@ -23,7 +23,6 @@ const LoginSchema = z.object({
 type FormValues = z.infer<typeof LoginSchema>;
 
 export default function LoginPage() {
-  const router = useRouter();
   const [form, setForm] = useState<FormValues>({ email: "", password: "" });
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<keyof FormValues, string>>
@@ -49,48 +48,34 @@ export default function LoginPage() {
       toast.error("Please fix the highlighted fields.");
       return;
     }
+
     setFieldErrors({});
     setLoading(true);
 
-    const absolute = `${window.location.origin}/`; // what you pass
-    console.log("callbackUrl sent from browser →", absolute);
+    // show toast immediately
+    toast.success("Signed in — welcome back!");
 
-    const res = await signIn("credentials", {
-      redirect: false,
+    // let NextAuth handle the full-page redirect
+    await signIn("credentials", {
       callbackUrl: "/dashboard",
       email: form.email,
       password: form.password,
     });
 
+    // we don’t call router.push or handle res here
     setLoading(false);
-
-    if (res?.ok) {
-      toast.success("Signed in — welcome back!");
-      router.push("/dashboard");
-    } else {
-      toast.error(res?.error ?? "Invalid e-mail or password");
-    }
   };
 
   /* Google OAuth */
-  const handleGoogle = async () => {
-  setOauthLoading(true);
-
-  // Ask NextAuth to return a URL instead of redirecting
-  const res = await signIn("google", {
-    redirect: false,
-    callbackUrl: "/dashboard",
-  });
-
-  setOauthLoading(false);
-
-  if (res?.url) {
-    // show the toast immediately
+  const handleGoogle = () => {
+    setOauthLoading(true);
+    // show toast immediately
     toast.success("Signed in — welcome back!");
-    router.push(res.url);
-  } else {
-  }
-};
+    // let NextAuth do the redirect
+    signIn("google", { callbackUrl: "/dashboard" });
+    // no need to await or router.push
+    setOauthLoading(false);
+  };
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-950 px-4">

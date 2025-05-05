@@ -4,7 +4,6 @@
 import React, { useState, useEffect } from "react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { ModeToggle } from "@/components/mode-toggle";
 
 interface SidebarLayoutProps {
   children: React.ReactNode;
@@ -41,7 +40,7 @@ export default function SidebarLayout({
       <AppSidebar />
       <div className="pt-2 flex-col">
         <div className="flex-col">
-          <ModeToggle />
+          {/* <ModeToggle /> */}
         </div>
       </div>
       <main className="flex-1 overflow-y-auto">{children}</main>
