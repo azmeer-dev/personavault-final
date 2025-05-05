@@ -187,7 +187,7 @@ function Sidebar({
           className="
             absolute inset-y-0 left-0 z-50 
             flex w-4 -translate-x-1/2 items-center justify-center
-            hover:bg-sidebar-accent hover:text-sidebar-accent-foreground
+            bg-sidebar-accent text-sidebar-accent-foreground
           "
         />
   
