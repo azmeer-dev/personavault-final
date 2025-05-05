@@ -40,7 +40,7 @@ export default function SidebarLayout({
     <SidebarProvider open={open} onOpenChange={setOpen}>
       <AppSidebar />
       <div className="pt-2 flex-col">
-        <div>
+        <div className="flex-col">
           <ModeToggle />
         </div>
       </div>
