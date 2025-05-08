@@ -64,7 +64,7 @@ model VerificationToken {
 model Identity {
   id           String     @id @default(cuid())
   userId       String
-  type         String
+  category         String
   name         String
   description  String?
   customValue  String?

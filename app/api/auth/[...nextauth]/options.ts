@@ -1,4 +1,4 @@
-import  { NextAuthOptions, Profile } from "next-auth";
+import { NextAuthOptions, Profile } from "next-auth";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
@@ -11,12 +11,10 @@ import bcrypt from "bcrypt";
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
 
-  // Use JWT sessions
   session: {
     strategy: "jwt",
   },
 
-  // Custom sign-in page
   pages: {
     signIn: "/signin",
   },
@@ -45,9 +43,7 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      // ensure we get email in the OAuth response
       authorization: { params: { scope: "openid profile email" } },
-      // preserve your merging logic
       allowDangerousEmailAccountLinking: true,
     }),
 
@@ -71,16 +67,16 @@ export const authOptions: NextAuthOptions = {
   ],
 
   callbacks: {
-    async jwt({ token, user, account, profile }) {
+    // Always issue JWT with the user's email from the User table
+    async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-      }
-      if (account?.provider !== "credentials" && profile?.email) {
-        token.email = profile.email;
+        token.email = user.email!;
       }
       return token;
     },
 
+    // Always read email for the session from token.email (i.e. user.email)
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
@@ -89,8 +85,8 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
 
+    // On first OAuth sign-in, populate user.name/image if missing
     async signIn({ user, account, profile }) {
-      // on first OAuth sign-in, populate user.name/image if missing
       if (
         account?.provider !== "credentials" &&
         (profile as Profile).name &&
@@ -109,9 +105,15 @@ export const authOptions: NextAuthOptions = {
   },
 
   events: {
-    // AFTER the Account row is created/linked, persist the provider's email
+    // After linking an OAuth account, persist its email into the account table
     async linkAccount({ account, profile }) {
-      if (account.provider === "google" && (profile as Profile).email) {
+      if (
+        (account.provider === "google" ||
+          account.provider === "github" ||
+          account.provider === "linkedin" ||
+          account.provider === "twitch") &&
+        (profile as Profile).email
+      ) {
         await prisma.account.update({
           where: {
             provider_providerAccountId: {
@@ -126,7 +128,7 @@ export const authOptions: NextAuthOptions = {
       }
     },
 
-    // merge newly created OAuth user into existing credentials user
+    // Merge newly created OAuth user into an existing credentials user if same email
     async createUser({ user }) {
       if (!user.email) return;
       const existing = await prisma.user.findFirst({

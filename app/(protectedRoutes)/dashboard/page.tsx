@@ -116,7 +116,7 @@ export default function DashboardPage() {
                 value={data.accounts}
                 href="/connected-accounts"
               />
-              <StatCard title="Identities" value={data.identities} />
+              <StatCard title="Identities" value={data.identities} href="/identities"/>
               <StatCard title="API Apps" value={data.apps} />
               <StatCard title="Pending Consents" value={data.pendingConsents} />
               <StatCard

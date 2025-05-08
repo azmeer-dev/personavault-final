@@ -19,13 +19,22 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { Bell, ChevronsUpDown, LogOut, LogIn as LoginIcon } from "lucide-react";
+import {
+  Bell,
+  ChevronsUpDown,
+  LogOut,
+  LogIn as LoginIcon,
+  Sun,
+  Moon,
+  Laptop
+} from "lucide-react";
+import { useTheme } from "next-themes";
 
 export function NavUser() {
   const { data: session } = useSession();
   const { isMobile } = useSidebar();
+  const { setTheme } = useTheme();
 
-  // Fallback to “Guest” if no session
   const user = session?.user
     ? {
         name: session.user.name || "",
@@ -61,38 +70,50 @@ export function NavUser() {
             align="end"
             sideOffset={4}
           >
-            {/* Guests see Sign In / Sign Up */}
-            {!session?.user && (
-              <>
-                <DropdownMenuGroup>
-                  <DropdownMenuItem asChild>
-                    <Link href="/signup">
-                      <Bell className="mr-2" /> Sign Up
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/signin">
-                      <LoginIcon className="mr-2"/>Sign In
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
+            {/* Theme selector items */}
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={() => setTheme("light")}>
+                <Sun className="mr-2 h-4 w-4" /> Light
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTheme("dark")}>
+                <Moon className="mr-2 h-4 w-4" /> Dark
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTheme("system")}>
+                <Laptop className="mr-2 h-4 w-4" /> System
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
 
-              </>
+            <DropdownMenuSeparator />
+
+            {/* Guests see Sign Up / Sign In */}
+            {!session?.user && (
+              <DropdownMenuGroup>
+                <DropdownMenuItem asChild>
+                  <Link href="/signup">
+                    <Bell className="mr-2 h-4 w-4" /> Sign Up
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/signin">
+                    <LoginIcon className="mr-2 h-4 w-4" /> Sign In
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
             )}
 
-            {/* Logged-in users see these options */}
+            {/* Logged-in users see Notifications / Sign Out */}
             {session?.user && (
               <>
                 <DropdownMenuGroup>
                   <DropdownMenuItem asChild>
                     <Link href="/notifications">
-                      <Bell className="mr-2" /> Notifications
+                      <Bell className="mr-2 h-4 w-4" /> Notifications
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => signOut({callbackUrl: "/signin"})}>
-                  <LogOut className="mr-2" /> Sign Out
+                <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/signin" })}>
+                  <LogOut className="mr-2 h-4 w-4" /> Sign Out
                 </DropdownMenuItem>
               </>
             )}

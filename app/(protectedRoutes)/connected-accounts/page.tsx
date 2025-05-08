@@ -7,12 +7,7 @@ import prisma from "@/lib/prisma";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableHeader,
@@ -25,9 +20,7 @@ import { Separator } from "@/components/ui/separator";
 
 import ConnectAccountButtons from "@/components/ConnectAccountButtons";
 
-// ————————————————————————————————————————————————
-// Manually declare the exact shape we're selecting
-// ————————————————————————————————————————————————
+//
 type LinkedAccount = {
   id: string;
   provider: string;
@@ -54,7 +47,6 @@ export default async function ConnectedAccountsPage() {
   if (!session?.user?.id) redirect("/signin");
   const userId = session.user.id;
 
-  // typed as LinkedAccount[], so `acc` is never `any`
   const linked: LinkedAccount[] = await prisma.account.findMany({
     where: { userId },
     select: {
@@ -91,18 +83,12 @@ export default async function ConnectedAccountsPage() {
               <TableBody>
                 {linked.map((acc) => (
                   <TableRow key={acc.id}>
-                    <TableCell className="capitalize">
-                      {acc.provider}
-                    </TableCell>
+                    <TableCell className="capitalize">{acc.provider}</TableCell>
                     <TableCell>{acc.providerAccountId}</TableCell>
                     <TableCell>{acc.email}</TableCell>
                     <TableCell className="text-right">
                       <form action={unlinkAccount}>
-                        <input
-                          type="hidden"
-                          name="accountId"
-                          value={acc.id}
-                        />
+                        <input type="hidden" name="accountId" value={acc.id} />
                         <Button variant="destructive" size="sm">
                           Unlink
                         </Button>

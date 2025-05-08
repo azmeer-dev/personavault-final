@@ -40,7 +40,6 @@ export default function SidebarLayout({
       <AppSidebar />
       <div className="pt-2 flex-col">
         <div className="flex-col">
-          {/* <ModeToggle /> */}
         </div>
       </div>
       <main className="flex-1 overflow-y-auto">{children}</main>
