@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
-import CreateIdentityForm from "./CreateIdentityForm";
+import CreateIdentityForm from "@/components/CreateIdentityForm";
 
 export default async function IdentitiesPage() {
   const session = await getServerSession(authOptions);
