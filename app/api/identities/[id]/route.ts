@@ -9,9 +9,9 @@ import { IdentitySchema } from "@/schemas/identity";
 
 export async function PUT(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await context.params;
+  const { id } = await params;
 
   // 1. Authenticate
   const session = await getServerSession(authOptions);
@@ -95,3 +95,4 @@ export async function PUT(
     );
   }
 }
+

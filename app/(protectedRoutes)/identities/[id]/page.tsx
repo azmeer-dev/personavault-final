@@ -8,29 +8,31 @@ import CreateIdentityForm from "@/components/CreateIdentityForm";
 import { IdentityFormData } from "@/schemas/identity";
 import { Prisma } from "@prisma/client";
 
-type Props = { params: { id: string } };
+type Props = {
+  params: Promise<{ id: string }>;
+  // If you end up needing searchParams, it’s also a Promise<{ [key: string]: string | string[] | undefined }>
+};
 
 export default async function EditIdentityPage({ params }: Props) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/signin");
 
-  const userId = session.user.id;
-  const { id: identityId } = await params; // <-- extract here
+  // Now this matches the Promise in your Props
+  const { id: identityId } = await params;
 
-  // Fetch the identity, scoped to this user
+  // …the rest of your logic is unchanged
+  const userId = session.user.id;
   const identity = await prisma.identity.findFirst({
     where: { id: identityId, userId },
     include: { accounts: { select: { id: true } } },
   });
   if (!identity) redirect("/identities");
 
-  // Fetch all connected accounts
   const accountOptions = await prisma.account.findMany({
     where: { userId },
     select: { id: true, provider: true, email: true },
   });
 
-  // Safely pull out JSON fields
   const cf = (identity.customFields as Prisma.JsonObject) ?? {};
   const previousNames =
     Array.isArray(cf.previousNames) &&
@@ -47,7 +49,6 @@ export default async function EditIdentityPage({ params }: Props) {
     : [];
   const isCustom = !!identity.customValue;
 
-  // Build initialData for the form
   const initialData: IdentityFormData = {
     name: identity.name,
     category: isCustom ? "Custom" : identity.category,
