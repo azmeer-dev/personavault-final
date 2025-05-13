@@ -25,7 +25,7 @@ type LinkedAccount = {
   id: string;
   provider: string;
   providerAccountId: string;
-  email: string | null;
+  emailFromProvider: string | null;
 };
 
 // ─── Server Action ─────────────────────────────────────────────
@@ -53,7 +53,7 @@ export default async function ConnectedAccountsPage() {
       id: true,
       provider: true,
       providerAccountId: true,
-      email: true,
+      emailFromProvider: true,
     },
     orderBy: { provider: "asc" },
   });
@@ -85,7 +85,7 @@ export default async function ConnectedAccountsPage() {
                   <TableRow key={acc.id}>
                     <TableCell className="capitalize">{acc.provider}</TableCell>
                     <TableCell>{acc.providerAccountId}</TableCell>
-                    <TableCell>{acc.email}</TableCell>
+                    <TableCell>{acc.emailFromProvider}</TableCell>
                     <TableCell className="text-right">
                       <form action={unlinkAccount}>
                         <input type="hidden" name="accountId" value={acc.id} />

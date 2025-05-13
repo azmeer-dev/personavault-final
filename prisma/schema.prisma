@@ -9,40 +9,47 @@ datasource db {
 }
 
 model User {
-  id              String           @id @default(cuid())
-  name            String?
-  email           String           @unique
-  emailVerified   DateTime?
-  image           String?
-  password        String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  accounts        Account[]
-  apps            App[]
-  consents        Consent[]
-  consentRequests ConsentRequest[]
-  identities      Identity[]
-  sessions        Session[]
+  id                     String           @id @default(cuid())
+  email                  String           @unique
+  emailVerified          DateTime?
+  passwordHash           String?
+  globalProfileImage     String?
+  globalDisplayName      String?
+  legalFullName          String?
+  userLevelNameHistory   Json?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  twoFactorSecret        String?
+  twoFactorEnabled       Boolean          @default(false)
+  accounts               Account[]
+  ownedApps              App[]
+  auditLogEntries        AuditLog[]       @relation("UserAuditLogEntries")
+  consentsGiven          Consent[]        @relation("UserConsents")
+  consentRequestsByUser  ConsentRequest[] @relation("RequestingUserConsentRequests")
+  consentRequestsForUser ConsentRequest[] @relation("TargetUserConsentRequests")
+  identities             Identity[]
+  sessions               Session[]
 }
 
 model Account {
-  id                String     @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  email             String?
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  identities        Identity[] @relation("AccountToIdentity")
+  id                 String     @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  emailFromProvider  String?
+  scope              String?
+  access_token       String?
+  expires_at         Int?
+  id_token           String?
+  refresh_token      String?
+  session_state      String?
+  token_type         String?
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedToIdentities Identity[] @relation("AccountIdentityLinks")
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
@@ -50,82 +57,202 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
+  userAgent    String?
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+  lastAccessed DateTime @updatedAt
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-
-model Identity {
-  id           String     @id @default(cuid())
-  userId       String
-  category         String
-  name         String
-  description  String?
-  customValue  String?
-  customFields Json?
-  visibility   Visibility @default(PRIVATE)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accounts     Account[]  @relation("AccountToIdentity")
 
   @@index([userId])
 }
 
-model App {
-  id             String           @id @default(cuid())
-  userId         String
-  name           String
-  apiKey         String
-  scopes         String[]
-  approved       Boolean          @default(true)
-  createdAt      DateTime         @default(now())
-  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  Consent        Consent[]
-  ConsentRequest ConsentRequest[]
+model VerificationToken {
+  identifier String
+  token      String                @unique
+  type       VerificationTokenType
+  expires    DateTime
+  createdAt  DateTime              @default(now())
+
+  @@unique([identifier, token, type])
 }
 
-model ConsentRequest {
-  id            String   @id @default(cuid())
-  userId        String
-  appId         String
-  context       String
-  requestedKeys String[]
-  approvedKeys  String[]
-  status        String   @default("pending")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  app           App      @relation(fields: [appId], references: [id], onDelete: Cascade)
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+model Identity {
+  id                       String               @id @default(cuid())
+  userId                   String
+  identityLabel            String
+  category                 IdentityCategoryType
+  customCategoryName       String?
+  description              String?
+  contextualNameDetails    Json
+  identityNameHistory      Json?
+  contextualReligiousNames String[]
+  genderIdentity           String?
+  customGenderDescription  String?
+  pronouns                 String?
+  dateOfBirth              DateTime?
+  location                 String?
+  profilePictureUrl        String?
+  identityContacts         Json?
+  onlinePresence           Json?
+  websiteUrls              String[]
+  additionalAttributes     Json?
+  visibility               IdentityVisibility   @default(PRIVATE)
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  relatedConsents          Consent[]            @relation("IdentityConsents")
+  relatedConsentRequests   ConsentRequest[]     @relation("IdentityConsentRequests")
+  user                     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedExternalAccounts   Account[]            @relation("AccountIdentityLinks")
+
+  @@index([userId, category])
+  @@index([userId, identityLabel])
+}
+
+model App {
+  id                     String           @id @default(cuid())
+  ownerId                String?
+  name                   String           @unique
+  description            String?
+  apiKeyHash             String           @unique
+  apiKeySalt             String
+  clientSecretHash       String?
+  clientSecretSalt       String?
+  redirectUris           String[]
+  allowedScopes          String[]
+  isConfidentialClient   Boolean          @default(true)
+  logoUrl                String?
+  websiteUrl             String?
+  privacyPolicyUrl       String?
+  termsOfServiceUrl      String?
+  isSystemApp            Boolean          @default(false)
+  isAdminApproved        Boolean          @default(true)
+  isEnabled              Boolean          @default(true)
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  owner                  User?            @relation(fields: [ownerId], references: [id])
+  auditLogEntries        AuditLog[]       @relation("AppAuditLogEntries")
+  consentsGrantedToApp   Consent[]        @relation("AppConsents")
+  consentRequestsFromApp ConsentRequest[] @relation("AppConsentRequests")
+
+  @@index([ownerId])
 }
 
 model Consent {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   userId        String
   appId         String
+  identityId    String?
   grantedScopes String[]
-  grantedAt     DateTime @default(now())
-  app           App      @relation(fields: [appId], references: [id], onDelete: Cascade)
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grantedAt     DateTime  @default(now())
+  expiresAt     DateTime?
+  lastUsedAt    DateTime?
+  revokedAt     DateTime?
+  app           App       @relation("AppConsents", fields: [appId], references: [id], onDelete: Cascade)
+  identity      Identity? @relation("IdentityConsents", fields: [identityId], references: [id], onDelete: Cascade)
+  user          User      @relation("UserConsents", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, appId, identityId], name: "UserAppIdentityConsent")
+  @@index([userId, appId])
+  @@index([identityId])
+}
+
+model ConsentRequest {
+  id                         String               @id @default(cuid())
+  targetUserId               String
+  appId                      String
+  requestingUserId           String?
+  identityId                 String?
+  contextDescription         String
+  requestedScopes            String[]
+  status                     ConsentRequestStatus @default(PENDING)
+  responseMessageToRequester String?
+  processedAt                DateTime?
+  expiresAt                  DateTime?
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+  app                        App                  @relation("AppConsentRequests", fields: [appId], references: [id], onDelete: Cascade)
+  identity                   Identity?            @relation("IdentityConsentRequests", fields: [identityId], references: [id], onDelete: Cascade)
+  requestingUser             User?                @relation("RequestingUserConsentRequests", fields: [requestingUserId], references: [id])
+  targetUser                 User                 @relation("TargetUserConsentRequests", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@index([targetUserId, appId])
+  @@index([status])
 }
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  actorId     String
-  targetId    String
-  action      String
-  beforeValue String?
-  afterValue  String?
-  timestamp   DateTime @default(now())
+  id               String          @id @default(cuid())
+  timestamp        DateTime        @default(now())
+  actorType        AuditActorType
+  actorIdentifier  String?
+  action           String
+  targetEntityType String?
+  targetEntityId   String?
+  details          Json?
+  outcome          AuditLogOutcome @default(SUCCESS)
+  actorApp        App?            @relation("AppAuditLogEntries", fields: [actorIdentifier], references: [id], map: "audit_actor_app_fk")
+  actorUser        User?           @relation("UserAuditLogEntries", fields: [actorIdentifier], references: [id], map: "audit_actor_user_fk")
+
+  @@index([timestamp])
+  @@index([actorType, actorIdentifier])
+  @@index([targetEntityType, targetEntityId])
+  @@index([action])
+  @@index([outcome])
 }
 
-enum Visibility {
+enum VerificationTokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+  TWO_FACTOR_SETUP
+  API_KEY_VERIFICATION
+}
+
+enum IdentityCategoryType {
+  PERSONAL
+  PROFESSIONAL
+  ACADEMIC
+  FAMILY
+  SOCIAL_MEDIA
+  MESSAGING_PLATFORM
+  GAMING
+  CREATIVE_ENDEAVOR
+  HEALTH_WELLNESS
+  TRAVEL_ADVENTURE
+  LEGAL_ADMINISTRATIVE
+  FINANCIAL_TRANSACTIONS
+  E_COMMERCE_SHOPPING
+  GOVERNMENT_SERVICES
+  UTILITY_SERVICES
+  IOT_DEVICE
+  DEVELOPMENT_CODING
+  COMMUNITY_FORUM
+  ANONYMOUS_PSEUDONYMOUS
+  CUSTOM
+}
+
+enum IdentityVisibility {
   PUBLIC
+  AUTHENTICATED_USERS
+  APP_SPECIFIC
   PRIVATE
+}
+
+enum ConsentRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+enum AuditActorType {
+  USER
+  APP
+  SYSTEM
+}
+
+enum AuditLogOutcome {
+  SUCCESS
+  FAILURE
+  ATTEMPT
+  PENDING_VERIFICATION
 }

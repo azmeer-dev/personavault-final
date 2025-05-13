@@ -29,11 +29,11 @@ export async function GET() {
     ] = await Promise.all([
       prisma.account.count({ where: { userId } }),
       prisma.identity.count({ where: { userId } }),
-      prisma.app.count({ where: { userId } }),
+      prisma.app.count({ where: { ownerId : userId } }),
       prisma.consentRequest.count({
-        where: { userId, status: "pending" },
+        where: { targetUserId: userId, status: "PENDING" },
       }),
-      prisma.auditLog.count({ where: { actorId: userId } }),
+      prisma.auditLog.count({ where: { actorIdentifier: userId } }),
     ]);
 
     //returns the overview data

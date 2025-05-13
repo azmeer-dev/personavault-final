@@ -37,7 +37,7 @@ const navDataUser = {
   main: [
     // { title: "Home", url: "/" },
     { title: "Dashboard", url: "/dashboard", items: [], },
-    { title: "Linked Accounts", url: "/connected-accounts", items: [], },
+    { title: "Connected Accounts", url: "/connected-accounts", items: [], },
     { title: "Identities", url: "/identities", items: [], },
     { title: "API Clients", url: "/apiClients", items: [], },
     { title: "Pending Consents", url: "/consent", items: [], },

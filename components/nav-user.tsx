@@ -26,7 +26,9 @@ import {
   LogIn as LoginIcon,
   Sun,
   Moon,
-  Laptop
+  Laptop,
+  UserPlus, // Added for Sign Up
+  Settings, // Added for Account Settings
 } from "lucide-react";
 import { useTheme } from "next-themes";
 
@@ -37,11 +39,14 @@ export function NavUser() {
 
   const user = session?.user
     ? {
-        name: session.user.name || "",
+        name: session.user.name || "User", // Fallback to "User" if name is null/undefined
         email: session.user.email || "",
         avatar: session.user.image || "/placeholder-avatar.png",
       }
     : { name: "Guest", email: "", avatar: "/placeholder-avatar.png" };
+
+  // Note: session.user.id is available if you've configured it in your authOptions callbacks.
+  // You might use it for links, e.g., `/profile/${session.user.id}`
 
   return (
     <SidebarMenu>
@@ -54,7 +59,9 @@ export function NavUser() {
             >
               <Avatar className="h-8 w-8 rounded-lg">
                 <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="rounded-lg">?</AvatarFallback>
+                <AvatarFallback className="rounded-lg">
+                  {user.name ? user.name.charAt(0).toUpperCase() : "?"}
+                </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
@@ -65,7 +72,7 @@ export function NavUser() {
           </DropdownMenuTrigger>
 
           <DropdownMenuContent
-            className="min-w-[200px] rounded-lg"
+            className="min-w-[220px] rounded-lg" // Slightly increased min-width for new items
             side={isMobile ? "bottom" : "right"}
             align="end"
             sideOffset={4}
@@ -90,7 +97,7 @@ export function NavUser() {
               <DropdownMenuGroup>
                 <DropdownMenuItem asChild>
                   <Link href="/signup">
-                    <Bell className="mr-2 h-4 w-4" /> Sign Up
+                    <UserPlus className="mr-2 h-4 w-4" /> Sign Up {/* Changed Icon */}
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
@@ -101,12 +108,18 @@ export function NavUser() {
               </DropdownMenuGroup>
             )}
 
-            {/* Logged-in users see Notifications / Sign Out */}
+            {/* Logged-in users see more options */}
             {session?.user && (
               <>
                 <DropdownMenuGroup>
                   <DropdownMenuItem asChild>
-                    <Link href="/notifications">
+                    {/* You might want to make this path dynamic or configurable */}
+                    <Link href="/dashboard/settings/account">
+                      <Settings className="mr-2 h-4 w-4" /> Account Settings
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/notifications"> {/* Standardized path prefix */}
                       <Bell className="mr-2 h-4 w-4" /> Notifications
                     </Link>
                   </DropdownMenuItem>

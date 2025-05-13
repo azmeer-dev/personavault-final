@@ -23,7 +23,7 @@ const SignUpSchema = z
     name: z
       .string()
       .min(2, "Name must be at least 2 characters")
-      .max(50, "Name is too long"),
+      .max(100, "Name is too long"),
     email: z.string().email("Enter a valid e-mail address"),
     password: z
       .string()
