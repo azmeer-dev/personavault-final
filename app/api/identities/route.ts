@@ -1,107 +1,111 @@
-// app/api/identities/route.ts
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import prisma from "@/lib/prisma";
-import { z } from "zod";
-import { Prisma } from "@prisma/client";
 
-const PayloadSchema = z
-  .object({
-    name: z.string().min(1),
-    category: z.string().min(1),
-    customCategory: z.string().optional(),
-    description: z.string().optional(),
-    previousNames: z.string().optional(),
-    religiousNames: z.string().optional(),
-    visibility: z.enum(["PUBLIC", "PRIVATE"]),
-    connectedAccountIds: z.array(z.string()).optional(),
-    adHocAccounts: z
-      .array(
-        z.object({
-          provider: z.string().min(1),
-          info: z.string().min(1),
-        })
-      )
-      .optional(),
-  })
-  .refine((d) => d.category !== "Custom" || !!d.customCategory, {
-    message: "Custom category is required",
-    path: ["customCategory"],
-  });
-
-export async function POST(request: Request) {
-  // 1. Auth
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const userId = session.user.id;
-
-  // 2. Parse & validate
-  const body = await request.json();
-  const parsed = PayloadSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { errors: parsed.error.flatten() },
-      { status: 422 }
-    );
-  }
-
-  const {
-    name,
-    category,
-    customCategory,
-    description,
-    previousNames,
-    religiousNames,
-    visibility,
-    connectedAccountIds = [],
-    adHocAccounts = [],
-  } = parsed.data;
-
-  // 3. Build customFields
-  const customFields: Prisma.JsonObject = {};
-  if (previousNames) {
-    customFields.previousNames = previousNames
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }
-  if (religiousNames) {
-    customFields.religiousNames = religiousNames
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }
-  if (adHocAccounts.length) {
-    customFields.adHocAccounts = adHocAccounts;
-  }
-
-  // 4. Create with unchecked input
+export async function POST(req: Request) {
   try {
-    await prisma.identity.create({
+    const data = await req.json();
+
+    if (!data.userId || !data.identityLabel) {
+      return NextResponse.json(
+        { error: "Missing userId or identityLabel" },
+        { status: 400 }
+      );
+    }
+
+    const created = await prisma.identity.create({
       data: {
-        userId,
-        name,
-        category: category === "Custom" ? customCategory! : category,
-        description,
-        visibility,
-        customValue: category === "Custom" ? customCategory! : undefined,
-        customFields:
-          Object.keys(customFields).length > 0 ? customFields : undefined,
-        accounts:
-          connectedAccountIds.length > 0
-            ? { connect: connectedAccountIds.map((id) => ({ id })) }
-            : undefined,
+        userId: data.userId,
+        identityLabel: data.identityLabel,
+        category: data.category,
+        customCategoryName: data.customCategoryName,
+        description: data.description,
+        contextualNameDetails: data.contextualNameDetails,
+        identityNameHistory: data.identityNameHistory,
+        contextualReligiousNames: data.contextualReligiousNames,
+        genderIdentity: data.genderIdentity,
+        customGenderDescription: data.customGenderDescription,
+        pronouns: data.pronouns,
+        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
+        location: data.location,
+        profilePictureUrl: data.profilePictureUrl,
+        identityContacts: data.identityContacts,
+        onlinePresence: data.onlinePresence,
+        websiteUrls: data.websiteUrls,
+        additionalAttributes: data.additionalAttributes,
+        visibility: data.visibility,
+        linkedExternalAccounts: {
+          create: (data.linkedAccountIds || []).map((accountId: string) => ({
+            account: { connect: { id: accountId } },
+          })),
+        },
       },
     });
 
-    return NextResponse.json({ success: true }, { status: 201 });
+    return NextResponse.json(created);
   } catch (error) {
-    console.error(error);
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { error: error instanceof Error ? error.message : "Unknown error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(req: Request) {
+  try {
+    const data = await req.json();
+
+    if (!data.userId || !data.identityLabel) {
+      return NextResponse.json(
+        { error: "Missing userId or identityLabel" },
+        { status: 400 }
+      );
+    }
+
+    // Update many returns count only, so use findFirst to get id
+    const existing = await prisma.identity.findFirst({
+      where: { userId: data.userId, identityLabel: data.identityLabel },
+      select: { id: true },
+    });
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Identity not found or not owned by user" },
+        { status: 404 }
+      );
+    }
+
+    const updated = await prisma.identity.update({
+      where: { id: existing.id },
+      data: {
+        category: data.category,
+        customCategoryName: data.customCategoryName,
+        description: data.description,
+        contextualNameDetails: data.contextualNameDetails,
+        identityNameHistory: data.identityNameHistory,
+        contextualReligiousNames: data.contextualReligiousNames,
+        genderIdentity: data.genderIdentity,
+        customGenderDescription: data.customGenderDescription,
+        pronouns: data.pronouns,
+        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
+        location: data.location,
+        profilePictureUrl: data.profilePictureUrl,
+        identityContacts: data.identityContacts,
+        onlinePresence: data.onlinePresence,
+        websiteUrls: data.websiteUrls,
+        additionalAttributes: data.additionalAttributes,
+        visibility: data.visibility,
+        linkedExternalAccounts: {
+          deleteMany: {}, // remove existing links
+          create: (data.linkedAccountIds || []).map((accountId: string) => ({
+            account: { connect: { id: accountId } },
+          })),
+        },
+      },
+    });
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }

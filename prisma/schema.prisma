@@ -46,7 +46,7 @@ model Account {
   session_state      String?
   token_type         String?
   user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  linkedToIdentities Identity[] @relation("AccountIdentityLinks")
+  identityLinks      IdentityAccount[] // join table
 
   @@unique([provider, providerAccountId])
   @@index([userId])
@@ -76,6 +76,18 @@ model VerificationToken {
   @@unique([identifier, token, type])
 }
 
+model IdentityAccount {
+  identityId String
+  accountId  String
+
+  identity   Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  account    Account  @relation(fields: [accountId],  references: [id], onDelete: Cascade)
+
+  @@id([identityId, accountId])
+  @@index([accountId])
+}
+
+
 model Identity {
   id                       String               @id @default(cuid())
   userId                   String
@@ -102,7 +114,7 @@ model Identity {
   relatedConsents          Consent[]            @relation("IdentityConsents")
   relatedConsentRequests   ConsentRequest[]     @relation("IdentityConsentRequests")
   user                     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  linkedExternalAccounts   Account[]            @relation("AccountIdentityLinks")
+  linkedExternalAccounts   IdentityAccount[]
 
   @@index([userId, category])
   @@index([userId, identityLabel])

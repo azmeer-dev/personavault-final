@@ -10,7 +10,7 @@ import Link from "next/link";
 
 type Identity = {
   id: string;
-  name: string;
+  identityLabel: string;
   description: string | null;
 };
 
@@ -35,7 +35,7 @@ export default async function IdentitiesPage() {
 
   const identities: Identity[] = await prisma.identity.findMany({
     where: { userId },
-    select: { id: true, name: true, description: true },
+    select: { id: true, identityLabel: true, description: true },
     orderBy: { updatedAt: "desc" },
   });
 
@@ -51,7 +51,7 @@ export default async function IdentitiesPage() {
         identities.map((item) => (
           <Card key={item.id} className="space-y-4">
             <CardHeader className="flex justify-between items-center">
-              <span className="text-lg font-medium">{item.name}</span>
+              <span className="text-lg font-medium">{item.identityLabel}</span>
               <div className="flex space-x-2">
                 <Link href={`/identities/${item.id}`}>
                   <Button size="sm" variant="outline">

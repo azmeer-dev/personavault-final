@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
-import CreateIdentityForm from "@/components/CreateIdentityForm";
+import IdentityForm from "@/components/IdentityForm";
 
 export default async function IdentitiesPage() {
   const session = await getServerSession(authOptions);
@@ -12,13 +12,13 @@ export default async function IdentitiesPage() {
 
   const accountOptions = await prisma.account.findMany({
     where: { userId: session.user.id },
-    select: { id: true, provider: true, email:true },
+    select: { id: true, provider: true, emailFromProvider:true },
   });
 
   return (
-    <main className="p-6">
+    <main className="min-h-full p-6 min-w-4xl mx-auto overflow-y-auto">
       <h1 className="text-2xl font-semibold mb-4">New Identity</h1>
-      <CreateIdentityForm accountOptions={accountOptions} />
+      <IdentityForm userId={session.user.id} accounts={accountOptions} />
     </main>
   );
 }
