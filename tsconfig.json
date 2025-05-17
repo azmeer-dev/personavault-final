@@ -1,23 +1,33 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
-    "skipLibCheck": true, // suppress library type conflicts
+    "skipLibCheck": true, // ignore errors in .d.ts files
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
-    "moduleResolution": "node", // change from bundler to node
+    "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"],
-      "react-hook-form": ["node_modules/react-hook-form"],
-      "@hookform/resolvers": ["node_modules/@hookform/resolvers"]
+      "@/*": [
+        "./*"
+      ],
+      "react-hook-form": [
+        "node_modules/react-hook-form"
+      ],
+      "@hookform/resolvers": [
+        "node_modules/@hookform/resolvers"
+      ]
     },
     "plugins": [
       {
@@ -25,6 +35,14 @@
       }
     ]
   },
-  "include": ["next-env.d.ts","**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "next-env.d.ts",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next"
+  ]
 }
