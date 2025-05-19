@@ -1,6 +1,4 @@
-/* app/(protectedRoutes)/identities/loading.tsx
-   Shown while “create” or “edit” identity pages stream in.
-*/
+
 export default function IdentitiesLoading() {
   return (
     <main className="p-6 max-w-6xl mx-auto">
