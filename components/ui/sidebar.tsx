@@ -11,27 +11,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-import { ModeToggle } from "../mode-toggle";
-
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
-const SIDEBAR_KEYBOARD_SHORTCUT = "b";
+//const SIDEBAR_KEYBOARD_SHORTCUT = "b";
+const SIDEBAR_MOBILE_KEY = "sidebar_mobile_state";
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed";
@@ -68,10 +60,20 @@ function SidebarProvider({
   onOpenChange?: (open: boolean) => void;
 }) {
   const isMobile = useIsMobile();
-  const [openMobile, setOpenMobile] = React.useState(false);
 
-  // This is the internal state of the sidebar.
-  // We use openProp and setOpenProp for control from outside the component.
+  // restore mobile state from localStorage or default to false
+  const [openMobile, setOpenMobileState] = React.useState(() => {
+    if (typeof window === "undefined") return false;
+    const stored = localStorage.getItem(SIDEBAR_MOBILE_KEY);
+    return stored === "true" ? true : false;
+  });
+
+  // sync openMobile state to localStorage
+  React.useEffect(() => {
+    localStorage.setItem(SIDEBAR_MOBILE_KEY, openMobile ? "true" : "false");
+  }, [openMobile]);
+
+  // rest of your sidebar state for desktop (unchanged)
   const [_open, _setOpen] = React.useState(defaultOpen);
   const open = openProp ?? _open;
   const setOpen = React.useCallback(
@@ -83,35 +85,20 @@ function SidebarProvider({
         _setOpen(openState);
       }
 
-      // This sets the cookie to keep the sidebar state.
       document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
     },
     [setOpenProp, open]
   );
 
-  // Helper to toggle the sidebar.
+  // function to update mobile sidebar open state
+  const setOpenMobile = React.useCallback((value: boolean | ((value: boolean) => boolean)) => {
+    setOpenMobileState(value);
+  }, []);
+
   const toggleSidebar = React.useCallback(() => {
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
   }, [isMobile, setOpen, setOpenMobile]);
 
-  // Adds a keyboard shortcut to toggle the sidebar.
-  React.useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (
-        event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
-        (event.metaKey || event.ctrlKey)
-      ) {
-        event.preventDefault();
-        toggleSidebar();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [toggleSidebar]);
-
-  // We add a state so that we can do data-state="expanded" or "collapsed".
-  // This makes it easier to style the sidebar with Tailwind classes.
   const state = open ? "expanded" : "collapsed";
 
   const contextValue = React.useMemo<SidebarContextProps>(
@@ -129,6 +116,7 @@ function SidebarProvider({
 
   return (
     <SidebarContext.Provider value={contextValue}>
+      {/* existing code */}
       <TooltipProvider delayDuration={0}>
         <div
           data-slot="sidebar-wrapper"
@@ -151,6 +139,7 @@ function SidebarProvider({
     </SidebarContext.Provider>
   );
 }
+
 
 function Sidebar({
   side = "left",
@@ -181,42 +170,51 @@ function Sidebar({
     );
   }
 
-  if (isMobile) {
+      if (isMobile) {
     return (
-      <>
-        <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
-          {/* Rail handle, centered vertically on the left edge */}
-          <SidebarRail
-            className="
-            absolute inset-y-0 left-0 z-50 
-            flex w-6 -translate-x-1/2 items-center justify-center
-            bg-sidebar-accent text-sidebar-accent-foreground mr-10
-          "
-          />
-
-          <SheetContent
+      <div
+        className="group peer text-sidebar-foreground block md:hidden"
+        data-state={openMobile ? "expanded" : "collapsed"}
+        data-collapsible={openMobile ? collapsible : ""}
+        data-variant={variant}
+        data-side={side}
+        data-slot="sidebar"
+        style={{ "--sidebar-width": SIDEBAR_WIDTH_MOBILE } as React.CSSProperties}
+        {...props}
+      >
+        <div
+          data-slot="sidebar-gap"
+          className={cn(
+            "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
+            "group-data-[collapsible=offcanvas]:w-0",
+            "group-data-[side=right]:rotate-180",
+            variant === "floating" || variant === "inset"
+              ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]"
+              : "group-data-[collapsible=icon]:w-(--sidebar-width-icon)"
+          )}
+          onClick={() => setOpenMobile(!openMobile)} // allow rail click toggle
+        />
+        <div
+          data-slot="sidebar-container"
+          className={cn(
+            "fixed inset-y-0 z-10 flex h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear",
+            side === "left"
+              ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
+              : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
+            variant === "floating" || variant === "inset"
+              ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
+              : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l"
+          )}
+        >
+          <div
             data-sidebar="sidebar"
-            data-slot="sidebar"
-            className="bg-sidebar text-sidebar-foreground p-0"
-            style={
-              {
-                "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
-              } as React.CSSProperties
-            }
-            side={side}
+            data-slot="sidebar-inner"
+            className="bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
           >
-            <SheetHeader className="sr-only">
-              <SheetTitle>Menu</SheetTitle>
-              <SheetDescription>Mobile sidebar</SheetDescription>
-            </SheetHeader>
-
-            <div className="flex h-full w-full flex-col">{children}</div>
-          </SheetContent>
-        </Sheet>
-        <div className="ml-4">
-          <ModeToggle />
+            {children}
+          </div>
         </div>
-      </>
+      </div>
     );
   }
 

@@ -1,45 +1,54 @@
-// app/identities/[id]/loading.tsx
-"use client";
-
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-
-export default function EditIdentityLoading() {
+/* app/(protectedRoutes)/identities/loading.tsx
+   Shown while “create” or “edit” identity pages stream in.
+*/
+export default function IdentitiesLoading() {
   return (
-    <form className="space-y-8 max-w-xl p-8 bg-card text-card-foreground rounded-lg shadow">
-      {/* same skeleton fields as CreateIdentityLoading */}
-      {["Category","Custom Category","Identity Name","Previous Names","Religious Names"].map((label) => (
-        <div key={label} className="space-y-1">
-          <Label>{label}</Label>
-          <Skeleton className="h-10 w-full" />
+    <main className="p-6 max-w-6xl mx-auto">
+      {/* heading skeleton */}
+      <div className="h-8 w-40 mb-6 rounded bg-muted animate-pulse" />
+
+      {/* two-column skeleton that mirrors the final layout */}
+      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-[1fr_400px]">
+        {/* left column – form placeholder */}
+        <div className="space-y-6 overflow-hidden">
+          {/* accordion sections */}
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="space-y-4">
+              <div className="h-6 w-1/3 rounded bg-muted animate-pulse" />
+              {/* four input lines */}
+              {Array.from({ length: 4 }).map((__, j) => (
+                <div
+                  key={j}
+                  className="h-10 rounded bg-muted/60 animate-pulse"
+                />
+              ))}
+            </div>
+          ))}
+
+          {/* submit button skeleton */}
+          <div className="h-10 w-full rounded bg-muted animate-pulse" />
         </div>
-      ))}
-      <div className="space-y-1">
-        <Label>Description</Label>
-        <Skeleton className="h-24 w-full" />
-      </div>
-      <div className="space-y-1">
-        <Label>Visibility</Label>
-        <div className="flex space-x-4">
-          <Skeleton className="h-6 w-16" />
-          <Skeleton className="h-6 w-16" />
+
+        {/* right column – preview card placeholder */}
+        <div className="hidden md:block sticky top-4 self-start">
+          <div className="p-4 border rounded-xl space-y-4 w-[400px]">
+            <div className="flex items-center gap-4">
+              <div className="h-[60px] w-[60px] rounded-full bg-muted animate-pulse" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 w-1/2 rounded bg-muted animate-pulse" />
+                <div className="h-3 w-1/3 rounded bg-muted/60 animate-pulse" />
+              </div>
+            </div>
+            {/* body lines */}
+            {Array.from({ length: 5 }).map((_, k) => (
+              <div
+                key={k}
+                className="h-3 w-full rounded bg-muted/50 animate-pulse"
+              />
+            ))}
+          </div>
         </div>
       </div>
-      <div className="space-y-1">
-        <Label>Linked Accounts</Label>
-        <Skeleton className="h-10 w-1/2" />
-      </div>
-      <div className="space-y-1">
-        <Label>Ad-hoc Accounts</Label>
-        <div className="space-y-2">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-6 w-40" />
-        </div>
-      </div>
-      <div className="pt-4">
-        <Skeleton className="h-10 w-full" />
-      </div>
-    </form>
+    </main>
   );
 }
