@@ -7,6 +7,7 @@ import {
   useFieldArray,
   FormProvider,
   useFormContext,
+  Resolver,
 } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
@@ -284,7 +285,7 @@ export default function IdentityForm({
   const [uploading, setUploading] = useState(false);
 
   const form = useForm<IdentityFormValues>({
-    resolver: zodResolver(identityFormSchema),
+    resolver: zodResolver(identityFormSchema) as Resolver<IdentityFormValues>,
     defaultValues: {
       identityLabel: '',
       category: 'PERSONAL',

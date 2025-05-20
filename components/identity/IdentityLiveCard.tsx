@@ -1,26 +1,26 @@
-'use client';
+"use client";
 
-import Image from 'next/image';
-import type { IdentityFormValues } from '@/types/types';
+import Image from "next/image";
+import type { IdentityFormValues } from "@/types/types";
 
 /* ------------------------------------------------------------------ */
-/*  Types                                                              */
+/*  Types                                                             */
 /* ------------------------------------------------------------------ */
 
 type Slice = Pick<
   IdentityFormValues,
-  | 'identityLabel'
-  | 'profilePictureUrl'
-  | 'description'
-  | 'category'
-  | 'customCategoryName'
-  | 'contextualNameDetails'
-  | 'pronouns'
-  | 'genderIdentity'
-  | 'location'
-  | 'dateOfBirth'
-  | 'websiteUrls'
-  | 'linkedAccountIds'
+  | "identityLabel"
+  | "profilePictureUrl"
+  | "description"
+  | "category"
+  | "customCategoryName"
+  | "contextualNameDetails"
+  | "pronouns"
+  | "genderIdentity"
+  | "location"
+  | "dateOfBirth"
+  | "websiteUrls"
+  | "linkedAccountIds"
 >;
 
 interface AccountOption {
@@ -32,6 +32,7 @@ interface AccountOption {
 export interface IdentityLiveCardProps {
   data: Slice;
   accounts: AccountOption[];
+  classProp?: string;
 }
 
 /* utility right above the component body */
@@ -40,28 +41,31 @@ function capitalize(word: string): string {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Component                                                          */
+/*  Component                                                         */
 /* ------------------------------------------------------------------ */
 
 export default function IdentityLiveCard({
   data,
   accounts,
+  classProp
 }: IdentityLiveCardProps) {
   /* derive values */
   const category =
-    data.category === 'CUSTOM'
-      ? data.customCategoryName || 'Custom'
+    data.category === "CUSTOM"
+      ? data.customCategoryName || "Custom"
       : data.category;
 
-  const prefName   = data.contextualNameDetails?.preferredName?.trim();
-  const usageCtx   = data.contextualNameDetails?.usageContext?.trim();
-  const site       = data.websiteUrls?.[0];
-  const linked     = accounts.filter((a) => data.linkedAccountIds?.includes(a.id));
+  const prefName = data.contextualNameDetails?.preferredName?.trim();
+  const usageCtx = data.contextualNameDetails?.usageContext?.trim();
+  const site = data.websiteUrls?.[0];
+  const linked = accounts.filter((a) => data.linkedAccountIds?.includes(a.id));
 
   /* styles */
-  const cardClass =
-    'flex items-center gap-6 p-6 rounded-2xl shadow-sm border bg-background w-full';
-  const infoLabel = 'text-xs font-medium text-muted-foreground';
+  const cardClass = `flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 p-4 sm:p-6 rounded-2xl shadow-sm border bg-background w-full ${
+    classProp ?? ""
+  }`;
+
+  const infoLabel = "text-xs font-medium text-muted-foreground";
 
   return (
     <div className={cardClass}>
@@ -72,21 +76,21 @@ export default function IdentityLiveCard({
           alt="avatar"
           width={80}
           height={80}
-          className="rounded-full object-cover"
+          className="rounded-full object-cover w-20 h-20 sm:w-[80px] sm:h-[80px]"
           priority
         />
       ) : (
-        <div className="h-[80px] w-[80px] rounded-full bg-muted flex items-center justify-center">
+        <div className="w-20 h-20 sm:w-[80px] sm:h-[80px] rounded-full bg-muted flex items-center justify-center">
           <span className="text-sm text-muted-foreground">No Img</span>
         </div>
       )}
 
       {/* Text block */}
-      <div className="flex-1 space-y-2">
+      <div className="flex-1 w-full space-y-2 text-center sm:text-left">
         {/* headline */}
         <div>
           <h2 className="text-lg font-semibold leading-snug">
-            {data.identityLabel || 'Untitled identity'}
+            {data.identityLabel || "Untitled identity"}
           </h2>
           <p className="text-sm text-muted-foreground">{category}</p>
           {prefName && (
@@ -105,7 +109,7 @@ export default function IdentityLiveCard({
         )}
 
         {/* info grid */}
-        <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-sm">
           {data.pronouns?.trim() && (
             <>
               <span className={infoLabel}>Pronouns</span>
@@ -140,7 +144,7 @@ export default function IdentityLiveCard({
                   rel="noopener noreferrer"
                   className="underline text-primary"
                 >
-                  {site.replace(/^https?:\/\//, '')}
+                  {site.replace(/^https?:\/\//, "")}
                 </a>
               </span>
             </>

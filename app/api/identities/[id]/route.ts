@@ -1,24 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 import prisma from '@/lib/prisma';
 import { identityFormSchema } from '@/schemas/identityFormSchema';
+
+const SECRET = process.env.NEXTAUTH_SECRET;
 
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const identityId = params.id;
+  const token = await getToken({ req, secret: SECRET });
+
+  if (!token || !token.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
   try {
     const json = await req.json();
     const data = identityFormSchema.parse(json);
 
-    //check if identity exists before update
-    const existing = await prisma.identity.findUnique({ where: { id: identityId } });
+    // Verify the identity belongs to the session user
+    const existing = await prisma.identity.findUnique({
+      where: { id: identityId },
+      select: { userId: true },
+    });
+
     if (!existing) {
-      return NextResponse.json({ error: 'identity not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Identity not found' }, { status: 404 });
     }
 
-    //transaction: update identity and reset linked accounts
+    if (existing.userId !== token.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Transaction: update identity and reset linked accounts
     const updatedIdentity = await prisma.$transaction(async (prismaTx) => {
       await prismaTx.identityAccount.deleteMany({ where: { identityId } });
 

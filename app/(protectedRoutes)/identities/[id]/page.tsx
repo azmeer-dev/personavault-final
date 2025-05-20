@@ -1,105 +1,118 @@
 // app/(protectedRoutes)/identities/[id]/page.tsx
-import prisma from '@/lib/prisma';
-import { getServerSession } from 'next-auth/next';
-import { redirect } from 'next/navigation';
-import { authOptions } from '@/app/api/auth/[...nextauth]/options';
-
-import IdentityEditor from '@/components/identity/IdentityEditor';
-import type { IdentityFormValues } from '@/types/types';
+import prisma from "@/lib/prisma";
+import { getServerSession } from "next-auth/next";
+import { redirect } from "next/navigation";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import * as React from "react";
+import IdentityEditor from "@/components/identity/IdentityEditor";
+import type { IdentityFormValues } from "@/types/types";
 
 /* ------------------------------------------------------------------ */
-/*  Utility parsers (unchanged)                                       */
+/*  Utility parsers                                                   */
 /* ------------------------------------------------------------------ */
 
-type ContextualNameDetailsRaw = { preferredName: unknown; usageContext: unknown };
+type ContextualNameDetailsRaw = {
+  preferredName: unknown;
+  usageContext: unknown;
+};
 
-function parseContextualNameDetails(
-  val: unknown,
-): { preferredName: string; usageContext: string } {
+function parseContextualNameDetails(val: unknown): {
+  preferredName: string;
+  usageContext: string;
+} {
   if (
     val &&
-    typeof val === 'object' &&
+    typeof val === "object" &&
     !Array.isArray(val) &&
-    'preferredName' in val &&
-    'usageContext' in val
+    "preferredName" in val &&
+    "usageContext" in val
   ) {
     const obj = val as ContextualNameDetailsRaw;
     return {
       preferredName:
-        typeof obj.preferredName === 'string'
+        typeof obj.preferredName === "string"
           ? obj.preferredName
           : String(obj.preferredName),
       usageContext:
-        typeof obj.usageContext === 'string'
+        typeof obj.usageContext === "string"
           ? obj.usageContext
           : String(obj.usageContext),
     };
   }
-  return { preferredName: '', usageContext: '' };
+  return { preferredName: "", usageContext: "" };
 }
 
-type HistoryEntryRaw = { name: unknown; from: unknown; to: unknown; context: unknown };
+type HistoryEntryRaw = {
+  name: unknown;
+  from: unknown;
+  to: unknown;
+  context: unknown;
+};
 
 function parseIdentityNameHistory(
-  val: unknown,
+  val: unknown
 ): { name: string; from: string; to: string; context: string }[] {
   if (!Array.isArray(val)) return [];
   return val
     .filter(
       (item): item is HistoryEntryRaw =>
         item &&
-        typeof item === 'object' &&
-        'name' in item &&
-        'from' in item &&
-        'to' in item &&
-        'context' in item,
+        typeof item === "object" &&
+        "name" in item &&
+        "from" in item &&
+        "to" in item &&
+        "context" in item
     )
     .map((item) => ({
-      name: typeof item.name === 'string' ? item.name : String(item.name),
-      from: typeof item.from === 'string' ? item.from : String(item.from),
-      to: typeof item.to === 'string' ? item.to : String(item.to),
-      context: typeof item.context === 'string' ? item.context : String(item.context),
+      name: typeof item.name === "string" ? item.name : String(item.name),
+      from: typeof item.from === "string" ? item.from : String(item.from),
+      to: typeof item.to === "string" ? item.to : String(item.to),
+      context:
+        typeof item.context === "string" ? item.context : String(item.context),
     }));
 }
 
 function parseRecord(val: unknown): Record<string, string> {
-  if (val && typeof val === 'object' && !Array.isArray(val)) {
+  if (val && typeof val === "object" && !Array.isArray(val)) {
     const out: Record<string, string> = {};
-    for (const [k, v] of Object.entries(val)) if (typeof v === 'string') out[k] = v;
+    for (const [k, v] of Object.entries(val))
+      if (typeof v === "string") out[k] = v;
     return out;
   }
   return {};
 }
 
-function parseVisibility(val: unknown): 'PRIVATE' | 'PUBLIC' {
-  return val === 'PUBLIC' ? 'PUBLIC' : 'PRIVATE';
+function parseVisibility(val: unknown): "PRIVATE" | "PUBLIC" {
+  return val === "PUBLIC" ? "PUBLIC" : "PRIVATE";
 }
 
 /* ------------------------------------------------------------------ */
 /*  Page component                                                    */
 /* ------------------------------------------------------------------ */
 
-interface PageProps {
-  params: { id: string };
-}
+export default async function EditIdentityPage({
+  params,
+}: {
+  params: Promise<{ id: string }>; //adapted typing
+}) {
+  const { id: identityId } = await params; //await first, then destructure
 
-export default async function EditIdentityPage({ params }: PageProps) {
-  /* -------- Auth -------- */
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) redirect('/signin');
+  if (!session?.user?.id) redirect("/signin");
+
   const userId = session.user.id;
 
   /* -------- Data fetch -------- */
   const identity = await prisma.identity.findFirst({
-    where: { id: params.id, userId },
+    where: { id: identityId, userId },
     include: { linkedExternalAccounts: { select: { accountId: true } } },
   });
-  if (!identity) redirect('/identities');
+  if (!identity) redirect("/identities");
 
   const rawAccounts = await prisma.account.findMany({
     where: { userId },
     select: { id: true, provider: true, emailFromProvider: true },
-    orderBy: { provider: 'asc' },
+    orderBy: { provider: "asc" },
   });
 
   const accountOptions = rawAccounts.map((a) => ({
@@ -112,19 +125,21 @@ export default async function EditIdentityPage({ params }: PageProps) {
   const initialValues: Partial<IdentityFormValues> = {
     identityLabel: identity.identityLabel,
     category: identity.category,
-    customCategoryName: identity.customCategoryName ?? '',
-    description: identity.description ?? '',
-    contextualNameDetails: parseContextualNameDetails(identity.contextualNameDetails),
+    customCategoryName: identity.customCategoryName ?? "",
+    description: identity.description ?? "",
+    contextualNameDetails: parseContextualNameDetails(
+      identity.contextualNameDetails
+    ),
     identityNameHistory: parseIdentityNameHistory(identity.identityNameHistory),
     contextualReligiousNames: identity.contextualReligiousNames ?? [],
-    genderIdentity: identity.genderIdentity ?? '',
-    customGenderDescription: identity.customGenderDescription ?? '',
-    pronouns: identity.pronouns ?? '',
+    genderIdentity: identity.genderIdentity ?? "",
+    customGenderDescription: identity.customGenderDescription ?? "",
+    pronouns: identity.pronouns ?? "",
     dateOfBirth: identity.dateOfBirth
       ? identity.dateOfBirth.toISOString().slice(0, 10)
-      : '',
-    location: identity.location ?? '',
-    profilePictureUrl: identity.profilePictureUrl ?? '',
+      : "",
+    location: identity.location ?? "",
+    profilePictureUrl: identity.profilePictureUrl ?? "",
     identityContacts: parseRecord(identity.identityContacts),
     onlinePresence: parseRecord(identity.onlinePresence),
     websiteUrls: identity.websiteUrls ?? [],
@@ -142,7 +157,7 @@ export default async function EditIdentityPage({ params }: PageProps) {
         userId={userId}
         accounts={accountOptions}
         initialValues={initialValues}
-        identityId={params.id}
+        identityId={identityId}
       />
     </main>
   );
