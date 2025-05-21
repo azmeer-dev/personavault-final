@@ -40,5 +40,5 @@ export const identityFormSchema = z.object({
     required_error: "Visibility is required",
   }),
 
-  linkedAccountIds: z.array(z.string()),
+  linkedAccountIds: z.array(z.string()).optional(),
 });

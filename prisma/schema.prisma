@@ -195,17 +195,19 @@ model AuditLog {
   id               String          @id @default(cuid())
   timestamp        DateTime        @default(now())
   actorType        AuditActorType
-  actorIdentifier  String?
+  actorUserId      String?         // foreign key to User
+  actorAppId       String?         // foreign key to App
   action           String
   targetEntityType String?
   targetEntityId   String?
   details          Json?
   outcome          AuditLogOutcome @default(SUCCESS)
-  actorApp        App?            @relation("AppAuditLogEntries", fields: [actorIdentifier], references: [id], map: "audit_actor_app_fk")
-  actorUser        User?           @relation("UserAuditLogEntries", fields: [actorIdentifier], references: [id], map: "audit_actor_user_fk")
+
+  actorApp   App?  @relation("AppAuditLogEntries", fields: [actorAppId], references: [id])
+  actorUser  User? @relation("UserAuditLogEntries", fields: [actorUserId], references: [id])
 
   @@index([timestamp])
-  @@index([actorType, actorIdentifier])
+  @@index([actorType, actorUserId, actorAppId])
   @@index([targetEntityType, targetEntityId])
   @@index([action])
   @@index([outcome])

@@ -1,27 +1,29 @@
 "use client";
 
 import Image from "next/image";
-import type { IdentityFormValues } from "@/types/types";
+//import type { IdentityFormValues } from "@/types/types";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
 /* ------------------------------------------------------------------ */
 
-type Slice = Pick<
-  IdentityFormValues,
-  | "identityLabel"
-  | "profilePictureUrl"
-  | "description"
-  | "category"
-  | "customCategoryName"
-  | "contextualNameDetails"
-  | "pronouns"
-  | "genderIdentity"
-  | "location"
-  | "dateOfBirth"
-  | "websiteUrls"
-  | "linkedAccountIds"
->;
+type Slice = {
+  identityLabel: string;
+  profilePictureUrl?: string | null;
+  description?: string | null;
+  category: string;
+  customCategoryName?: string | null;
+  contextualNameDetails: {
+    preferredName: string;
+    usageContext: string;
+  };
+  pronouns?: string | null;
+  genderIdentity?: string | null;
+  location?: string | null;
+  dateOfBirth?: Date | string | null;
+  websiteUrls: string[];
+  linkedAccountIds?: string[];
+};
 
 interface AccountOption {
   id: string;
@@ -47,7 +49,7 @@ function capitalize(word: string): string {
 export default function IdentityLiveCard({
   data,
   accounts,
-  classProp
+  classProp,
 }: IdentityLiveCardProps) {
   /* derive values */
   const category =
@@ -128,10 +130,14 @@ export default function IdentityLiveCard({
               <span>{data.location}</span>
             </>
           )}
-          {data.dateOfBirth?.trim() && (
+          {data.dateOfBirth && (
             <>
               <span className={infoLabel}>DOB</span>
-              <span>{data.dateOfBirth}</span>
+              <span>
+                {data.dateOfBirth instanceof Date
+                  ? data.dateOfBirth.toISOString().split("T")[0]
+                  : data.dateOfBirth.trim?.() ?? ""}
+              </span>
             </>
           )}
           {site && (

@@ -25,23 +25,23 @@ import {
   FileText as FileIcon,
   Fingerprint,
   Link as LinkIcon,
+  Search as SearchIcon,
   LucideIcon,
 } from "lucide-react";
 
 const navDataNoUser = {
-  main: [
-    { title: "Home", url: "/", items: [], },
-  ],
+  main: [{ title: "Home", url: "/", items: [] }],
 };
 const navDataUser = {
   main: [
     // { title: "Home", url: "/" },
-    { title: "Dashboard", url: "/dashboard", items: [], },
-    { title: "Connected Accounts", url: "/connected-accounts", items: [], },
-    { title: "Identities", url: "/identities", items: [], },
-    { title: "API Clients", url: "/apiClients", items: [], },
-    { title: "Pending Consents", url: "/consent", items: [], },
-    { title: "Audit Logs", url: "/audit", items: [], },
+    { title: "Dashboard", url: "/dashboard", items: [] },
+    { title: "Connected Accounts", url: "/connected-accounts", items: [] },
+    { title: "Identities", url: "/identities", items: [] },
+    { title: "Explore", url: "/explore", items: [] },
+    { title: "API Clients", url: "/apiClients", items: [] },
+    { title: "Pending Consents", url: "/consent", items: [] },
+    { title: "Audit Logs", url: "/audit", items: [] },
   ],
 };
 // ─────────────────────────────
@@ -64,6 +64,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     "Linked Accounts": LinkIcon,
     Identities: Fingerprint,
     "API Clients": CodeIcon,
+    "Explore": SearchIcon,
     "Pending Consents": CheckIcon,
     "Audit Logs": FileIcon,
     Test: HomeIcon,
