@@ -1,13 +1,14 @@
 "use client";
 
 import Image from "next/image";
-//import type { IdentityFormValues } from "@/types/types";
+import { capitalize } from "@/lib/capitalize";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
 /* ------------------------------------------------------------------ */
 
 type Slice = {
+  identityId?: string;
   identityLabel: string;
   profilePictureUrl?: string | null;
   description?: string | null;
@@ -35,11 +36,6 @@ export interface IdentityLiveCardProps {
   data: Slice;
   accounts: AccountOption[];
   classProp?: string;
-}
-
-/* utility right above the component body */
-function capitalize(word: string): string {
-  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
 }
 
 /* ------------------------------------------------------------------ */
@@ -143,16 +139,7 @@ export default function IdentityLiveCard({
           {site && (
             <>
               <span className={infoLabel}>Website</span>
-              <span>
-                <a
-                  href={site}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline text-primary"
-                >
-                  {site.replace(/^https?:\/\//, "")}
-                </a>
-              </span>
+              <span>{site.replace(/^https?:\/\//, "")}</span>
             </>
           )}
           {linked.length > 0 && (

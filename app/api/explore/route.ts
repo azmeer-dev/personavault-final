@@ -1,55 +1,98 @@
 // app/api/explore/route.ts
+
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import prisma from "@/lib/prisma";
+import { type IdentityLiveCardProps } from "@/components/identity/IdentityLiveCard"; // Import the type
 
-// get public identities excluding the current user
+// fallback for contextualNameDetails (moved from page.tsx)
+const defaultContextual = { preferredName: "", usageContext: "" };
+
+// type guard for contextualNameDetails (moved from page.tsx)
+function isContextual(
+  val: unknown
+): val is { preferredName: string; usageContext: string } {
+  return (
+    typeof val === "object" &&
+    val !== null &&
+    "preferredName" in val &&
+    "usageContext" in val &&
+    typeof val.preferredName === "string" && // Added type assertion for safety
+    typeof val.usageContext === "string" // Added type assertion for safety
+  );
+}
+
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  const me = session?.user?.id;
+
+   const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.id;
+  console.log(userId)
 
   try {
+
+    // fetch all other users' public identities
     const identities = await prisma.identity.findMany({
       where: {
         visibility: "PUBLIC",
-        ...(me && { userId: { not: me } }),
+        ...(userId && { userId: { not: userId } }), // Exclude own identities if logged in
       },
+      orderBy: { updatedAt: "desc" },
       include: {
         linkedExternalAccounts: {
           select: {
-            accountId: true,             // include id for linking
-            account: { select: { provider: true } }, // include provider name
+            accountId: true,
+            account: { select: { provider: true } }, // Select provider from linked account
           },
         },
       },
-      orderBy: { updatedAt: "desc" },
     });
 
-    const payload = identities.map((i) => ({
-      id: i.id,
-      identityLabel: i.identityLabel,
-      category: i.category,
-      customCategoryName: i.customCategoryName ?? null,
-      description: i.description ?? null,
-      genderIdentity: i.genderIdentity ?? null,
-      pronouns: i.pronouns ?? null,
-      location: i.location ?? null,
-      dateOfBirth: i.dateOfBirth
-        ? i.dateOfBirth.toISOString().slice(0, 10)
-        : null,
-      profilePictureUrl: i.profilePictureUrl ?? null,
-      websiteUrls: i.websiteUrls,
-      contextualNameDetails: i.contextualNameDetails,
-      linkedAccountIds: i.linkedExternalAccounts.map((l) => l.accountId),
-      providers: i.linkedExternalAccounts.map((l) => l.account.provider),
-    }));
+    // map each row into the props your LiveCard expects
+    const cards: IdentityLiveCardProps[] = identities.map((row) => {
+      // narrow or fallback contextualNameDetails
+      const contextualDetails = isContextual(row.contextualNameDetails)
+        ? row.contextualNameDetails
+        : defaultContextual;
 
-    return NextResponse.json(payload);
-  } catch (err) {
-    console.error("failed to load public identities", err);
+      const data: IdentityLiveCardProps["data"] = {
+        identityLabel: row.identityLabel,
+        identityId: row.id,
+        profilePictureUrl: row.profilePictureUrl ?? null,
+        description: row.description ?? null,
+        category: row.category,
+        customCategoryName: row.customCategoryName ?? null,
+        contextualNameDetails: contextualDetails,
+        pronouns: row.pronouns ?? null,
+        genderIdentity: row.genderIdentity ?? null,
+        location: row.location ?? null,
+        dateOfBirth: row.dateOfBirth ?? null,
+        websiteUrls: row.websiteUrls ?? [],
+        linkedAccountIds: row.linkedExternalAccounts.map(
+          (l: { accountId: string }) => l.accountId
+        ),
+      };
+
+      const accounts: IdentityLiveCardProps["accounts"] =
+        row.linkedExternalAccounts.map(
+          (l: { accountId: string; account: { provider: string } }) => ({
+            id: l.accountId,
+            provider: l.account.provider,
+            emailFromProvider: null, // This field is not selected, so it's null
+          })
+        );
+
+      return { data, accounts };
+    });
+
+    return NextResponse.json(cards);
+  } catch (error) {
+    console.error("Failed to fetch public identities:", error);
     return NextResponse.json(
-      { error: "internal server error" },
+      { error: "Failed to fetch public identities" },
       { status: 500 }
     );
   }

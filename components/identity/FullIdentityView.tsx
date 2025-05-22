@@ -2,6 +2,7 @@
 "use client";
 
 import Image from "next/image";
+import { capitalize } from '../../lib/capitalize';
 
 interface FullIdentityViewProps {
   data: {
@@ -20,6 +21,7 @@ interface FullIdentityViewProps {
       usageContext: string;
     };
     linkedAccountEmails?: string[];
+    provider: string[];
   };
 }
 
@@ -37,6 +39,7 @@ export default function FullIdentityView({ data }: FullIdentityViewProps) {
     websiteUrls,
     contextualNameDetails,
     linkedAccountEmails,
+    provider,
   } = data;
 
   return (
@@ -104,15 +107,18 @@ export default function FullIdentityView({ data }: FullIdentityViewProps) {
             </a>
           </p>
         )}
-        {linkedAccountEmails && linkedAccountEmails.length > 0 && (
+         {linkedAccountEmails && linkedAccountEmails.length > 0 && (
           <p>
             <strong>Linked Accounts:</strong>{" "}
-            {linkedAccountEmails.map((email) => (
+            {linkedAccountEmails.map((email, index) => ( // Use 'index' to access the corresponding provider
               <span
-                key={email}
+                // Ensure key is unique, combining email and provider is a good approach here
+                key={`${email}-${provider?.[index]}`}
                 className="inline-block px-2 py-1 bg-muted rounded text-xs mr-1"
               >
                 {email}
+                {/* Display provider only if it exists at this index */}
+                {provider?.[index] && ` (${capitalize(provider[index])})`}
               </span>
             ))}
           </p>

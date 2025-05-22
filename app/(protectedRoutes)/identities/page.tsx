@@ -32,6 +32,7 @@ export default async function IdentitiesPage() {
 
   const cards: IdentityLiveCardProps[] = identities.map((row) => {
     const data: IdentityLiveCardProps["data"] = {
+      identityId: row.id,
       identityLabel: row.identityLabel,
       profilePictureUrl: row.profilePictureUrl ?? undefined,
       description: row.description ?? undefined,

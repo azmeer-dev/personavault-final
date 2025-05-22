@@ -7,7 +7,11 @@ import { notFound } from "next/navigation";
 import { AuditActorType, AuditLogOutcome } from "@prisma/client";
 //export const dynamic = "force-dynamic";
 
-export default async function IdentityPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function IdentityPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const resolvedParams = await params;
   const identity = await getIdentityById(resolvedParams.id);
   if (!identity) return notFound();
@@ -52,9 +56,12 @@ export default async function IdentityPage({ params }: { params: Promise<{ id: s
           profilePictureUrl: identity.profilePictureUrl,
           websiteUrls: identity.websiteUrls,
           contextualNameDetails: contextual,
-          linkedAccountEmails: identity.linkedExternalAccounts.map(
-            (a) => a.accountId
-          ),
+          linkedAccountEmails: identity.linkedExternalAccounts
+            .map((a) => a.account.emailFromProvider)
+            .filter((email): email is string => email !== null),
+          provider: identity.linkedExternalAccounts
+            .map((a) => a.account.provider)
+            .filter((provider): provider is string => provider !== null),
         }}
       />
     </div>

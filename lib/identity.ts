@@ -19,6 +19,13 @@ export async function logAuditEntry(data: LogAuditEntryData) {
 export async function getIdentityById(id: string) {
   return prisma.identity.findUnique({
     where: { id, visibility: "PUBLIC" },
-    include: { linkedExternalAccounts: { select: { accountId: true } } },
+    include: {
+      linkedExternalAccounts: {
+        select: {
+          accountId: true,
+          account: { select: { emailFromProvider: true, provider: true } },
+        },
+      },
+    },
   });
 }

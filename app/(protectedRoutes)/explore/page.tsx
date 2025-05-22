@@ -1,101 +1,43 @@
 // app/(protectedRoutes)/explore/page.tsx
-import Link from "next/link";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
-import prisma from "@/lib/prisma";
-import IdentityLiveCard, {
-  type IdentityLiveCardProps,
-} from "@/components/identity/IdentityLiveCard";
+'use client';
 
-// fallback for contextualNameDetails
-const defaultContextual = { preferredName: "", usageContext: "" };
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import IdentityLiveCard, { type IdentityLiveCardProps } from '@/components/identity/IdentityLiveCard';
 
-// type guard for contextualNameDetails
-function isContextual(
-  val: unknown
-): val is { preferredName: string; usageContext: string } {
-  return (
-    typeof val === "object" &&
-    val !== null &&
-    "preferredName" in val &&
-    "usageContext" in val &&
-    typeof (val).preferredName === "string" &&
-    typeof (val).usageContext === "string"
-  );
-}
+export default function ExplorePage() {
+  const [cards, setCards] = useState<IdentityLiveCardProps[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-export default async function ExplorePage() {
-  // get current user so we can exclude their own identities
-  const session = await getServerSession(authOptions);
-  const me = session?.user?.id;
-
-  // fetch all other users' public identities
-  const identities = await prisma.identity.findMany({
-    where: {
-      visibility: "PUBLIC",
-      ...(me && { userId: { not: me } }),
-    },
-    orderBy: { updatedAt: "desc" },
-    include: {
-      linkedExternalAccounts: {
-        select: {
-          accountId: true,
-          account: { select: { provider: true } },
-        },
-      },
-    },
-  });
-
-  // map each row into the props your LiveCard expects
-  const cards: IdentityLiveCardProps[] = identities.map((row) => {
-    // narrow or fallback contextualNameDetails
-    const contextualDetails = isContextual(row.contextualNameDetails)
-      ? row.contextualNameDetails
-      : defaultContextual;
-
-    const data: IdentityLiveCardProps["data"] = {
-      identityLabel: row.identityLabel,
-      profilePictureUrl: row.profilePictureUrl ?? null,
-      description: row.description ?? null,
-      category: row.category,
-      customCategoryName: row.customCategoryName ?? null,
-      contextualNameDetails: contextualDetails,
-      pronouns: row.pronouns ?? null,
-      genderIdentity: row.genderIdentity ?? null,
-      location: row.location ?? null,
-      dateOfBirth: row.dateOfBirth ?? null,
-      websiteUrls: row.websiteUrls ?? [],
-      linkedAccountIds: row.linkedExternalAccounts.map(
-        (l: { accountId: string }) => l.accountId
-      ),
-    };
-
-    const accounts: IdentityLiveCardProps["accounts"] =
-      row.linkedExternalAccounts.map(
-        (l: { accountId: string; account: { provider: string } }) => ({
-          id: l.accountId,
-          provider: l.account.provider,
-          emailFromProvider: null,
-        })
-      );
-
-    return { data, accounts };
-  });
+  useEffect(() => {
+    fetch('/api/explore', { credentials: 'include' })
+      .then(async (r) => {
+        if (!r.ok) {
+          const { error } = await r.json();
+          throw new Error(error ?? `HTTP ${r.status}`);
+        }
+        return r.json();
+      })
+      .then(setCards)
+      .catch((e) => setError(e.message));
+  }, []);
 
   return (
     <main className="space-y-8 p-6 max-w-6xl mx-auto">
       <h1 className="text-3xl font-semibold">Explore Public Identities</h1>
 
-      {cards.length === 0 ? (
+      {error ? (
+        <p className="text-red-500">Error loading identities: {error}</p>
+      ) : cards.length === 0 ? (
         <p className="text-muted-foreground">
           there are no public identities available.
         </p>
       ) : (
         <div className="space-y-6">
-          {cards.map((card, i) => (
+          {cards.map((card) => (
             <Link
-              href={`/identity/${identities[i].id}`}
-              key={identities[i].id}
+              href={`/explore/${card.data.identityId}`} // Assuming identityLabel is unique and can be used as a path
+              key={card.data.identityId} // Use a unique key like identityLabel or an actual ID if available
               className="block" // link to profile view
             >
               <div className="rounded-2xl shadow-sm border p-4 space-y-4">
