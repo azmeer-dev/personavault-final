@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import prisma from '@/lib/prisma';
 import { identityFormSchema } from '@/schemas/identityFormSchema';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 const SECRET = process.env.NEXTAUTH_SECRET;
 
@@ -127,7 +128,7 @@ export async function GET(
       console.log(`[GET /api/identities/${identityId}] Found identity for App ${authenticatedApp.id}, owner: ${identity.userId}`);
 
       // 1. Check for identity-specific consent
-      let consent = await prisma.consent.findFirst({
+      const consent = await prisma.consent.findFirst({
         where: {
           appId: authenticatedApp.id,
           userId: identity.userId,
@@ -258,12 +259,12 @@ export async function DELETE(
     // Returning 200 with a message is often preferred over 204 for DELETE if a confirmation is useful
     return NextResponse.json({ message: 'Identity deleted successfully' }, { status: 200 });
 
-  } catch (error) {
-    console.error(`[DELETE /api/identities/${identityId}] Error deleting identity for user ${token?.sub || 'unknown'}:`, error);
+  } catch (err) {
+    console.error(`[DELETE /api/identities/${identityId}] Error deleting identity for user :`, err);
     // Check for specific Prisma errors, e.g., P2025 (Record to delete does not exist)
     // Although findUnique should catch this first.
-    if (error instanceof prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2025') {
+    if (err instanceof PrismaClientKnownRequestError) {
+      if (err.code === 'P2025') {
         console.log(`[DELETE /api/identities/${identityId}] Prisma Error P2025: Record to delete does not exist (already deleted?).`);
         return NextResponse.json({ error: 'Identity not found or already deleted' }, { status: 404 });
       }
