@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import prisma from '@/lib/prisma';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+
 
 const SECRET = process.env.NEXTAUTH_SECRET;
 
@@ -47,7 +49,7 @@ export async function DELETE(
   } catch (error) {
     console.error('Error revoking consent:', error);
     // Check if it's a Prisma known error (e.g., record not found during update, though findUnique should catch it first)
-    if (error instanceof prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+    if (error instanceof PrismaClientKnownRequestError && error.code === 'P2025') {
         return NextResponse.json({ error: 'Consent not found' }, { status: 404 });
     }
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
