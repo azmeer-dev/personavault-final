@@ -14,7 +14,16 @@ export default async function IdentityPage({
 }) {
   const resolvedParams = await params;
   const identity = await getIdentityById(resolvedParams.id);
-  if (!identity) return notFound();
+
+  // --- MODIFICATION START ---
+  if (identity && identity.visibility !== 'PUBLIC') {
+    // Consider if a specific "forbidden" page is better, but notFound is fine for now
+    // as this URL path implies public exploration.
+    return notFound(); 
+  }
+  // --- MODIFICATION END ---
+
+  if (!identity) return notFound(); // This existing check is still good
 
   const session = await getServerSession(authOptions);
   const viewerId = session?.user?.id ?? "anonymous";
