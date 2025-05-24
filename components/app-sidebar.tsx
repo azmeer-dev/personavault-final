@@ -20,19 +20,14 @@ import { NavUser } from "@/components/nav-user";
 import {
   Home as HomeIcon,
   LayoutDashboardIcon as DashboardIcon,
-  Code as CodeIcon,
-  CheckCircle as CheckIcon,
   FileText as FileIcon,
   Fingerprint,
-  Link as LinkIcon,
-  Search as SearchIcon,
   LucideIcon,
   Globe, // Added
   AppWindow, // Added
   CheckCheck, // Added
   PlugZap, // Added
   MailQuestion, // Added
-  Settings as SettingsIcon, // Added
 } from "lucide-react";
 
 const navDataNoUser = {

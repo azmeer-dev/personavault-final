@@ -1,15 +1,15 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'; // Re-added Card for potential inner structure
+import { Card } from '@/components/ui/card'; // Re-added Card for potential inner structure
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Info, AlertTriangle, CheckCircle, Loader2, Settings, ShieldCheck } from 'lucide-react';
+import { Info, AlertTriangle, CheckCircle, Loader2, ShieldCheck } from 'lucide-react';
 
 // Types based on API responses
 interface ConnectableApp {
