@@ -41,11 +41,26 @@ export async function GET() {
         ...(userId && { userId: { not: userId } }), // Exclude own identities if logged in
       },
       orderBy: { updatedAt: "desc" },
-      include: {
+      select: { // Explicitly select fields to avoid fetching userId
+        id: true,
+        identityLabel: true,
+        profilePictureUrl: true,
+        description: true,
+        category: true,
+        customCategoryName: true,
+        contextualNameDetails: true,
+        pronouns: true,
+        genderIdentity: true,
+        location: true,
+        dateOfBirth: true,
+        websiteUrls: true,
+        visibility: true, // Still needed for the where clause, though not directly mapped
+        updatedAt: true, // Still needed for orderBy, though not directly mapped
+        // userId is now EXCLUDED from fetching
         linkedExternalAccounts: {
           select: {
             accountId: true,
-            account: { select: { provider: true } }, // Select provider from linked account
+            account: { select: { provider: true } },
           },
         },
       },

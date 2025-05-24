@@ -27,6 +27,12 @@ import {
   Link as LinkIcon,
   Search as SearchIcon,
   LucideIcon,
+  Globe, // Added
+  AppWindow, // Added
+  CheckCheck, // Added
+  PlugZap, // Added
+  MailQuestion, // Added
+  Settings as SettingsIcon, // Added
 } from "lucide-react";
 
 const navDataNoUser = {
@@ -36,11 +42,16 @@ const navDataUser = {
   main: [
     // { title: "Home", url: "/" },
     { title: "Dashboard", url: "/dashboard", items: [] },
-    { title: "Connected Accounts", url: "/connected-accounts", items: [] },
     { title: "Identities", url: "/identities", items: [] },
-    { title: "Explore", url: "/explore", items: [] },
-    { title: "API Clients", url: "/apiClients", items: [] },
-    { title: "Pending Consents", url: "/consent", items: [] },
+    // "Connected Accounts" is not part of the current scope, removed for now if it was a placeholder
+    // { title: "Connected Accounts", url: "/connected-accounts", items: [] },
+    { title: "Explore Identities", url: "/explore", items: [] }, // Renamed for clarity
+    { title: "My Applications", url: "/my-apps", items: [] },
+    { title: "Pending Requests", url: "/consent-requests", items: [] }, // Updated URL from /consent to /consent-requests
+    { title: "Granted Consents", url: "/settings/consents", items: [] },
+    { title: "App Permissions", url: "/settings/connected-apps", items: [] },
+    // "API Clients" is not part of the current scope, removed for now if it was a placeholder
+    // { title: "API Clients", url: "/apiClients", items: [] },
     { title: "Audit Logs", url: "/audit", items: [] },
   ],
 };
@@ -61,13 +72,17 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const iconMap: Record<string, LucideIcon> = {
     Home: HomeIcon,
     Dashboard: DashboardIcon,
-    "Linked Accounts": LinkIcon,
+    // "Linked Accounts": LinkIcon, // Removed as per navDataUser update
     Identities: Fingerprint,
-    "API Clients": CodeIcon,
-    "Explore": SearchIcon,
-    "Pending Consents": CheckIcon,
+    // "API Clients": CodeIcon, // Removed as per navDataUser update
+    "Explore Identities": Globe, // Updated icon
+    "My Applications": AppWindow,
+    "Pending Requests": MailQuestion, // Updated icon and title
+    "Granted Consents": CheckCheck,
+    "App Permissions": PlugZap,
     "Audit Logs": FileIcon,
-    Test: HomeIcon,
+    // "Settings": SettingsIcon, // If a general settings page existed
+    Test: HomeIcon, // Placeholder, can be removed
   };
 
   // Map your old data into NavMain shape

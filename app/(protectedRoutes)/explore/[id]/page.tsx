@@ -1,5 +1,6 @@
 // page.tsx
-import { getIdentityById, logAuditEntry } from "@/lib/identity";
+import { getIdentityById } from "@/lib/identity"; // logAuditEntry removed
+import { createAuditLog } from "@/lib/audit"; // createAuditLog added
 import FullIdentityProfile from "@/components/identity/FullIdentityView";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
@@ -29,15 +30,15 @@ export default async function IdentityPage({
   const viewerId = session?.user?.id ?? "anonymous";
   const viewerType = session ? AuditActorType.USER : AuditActorType.SYSTEM;
 
-  await logAuditEntry({
+  await createAuditLog({ // Changed to createAuditLog
     actorType: viewerType,
     actorUserId: viewerType === AuditActorType.USER ? viewerId : undefined,
-    actorAppId: undefined, // no APP actor here
+    actorAppId: undefined, 
     action: "VIEW_PUBLIC_IDENTITY",
     targetEntityType: "Identity",
     targetEntityId: identity.id,
     outcome: AuditLogOutcome.SUCCESS,
-    details: { source: "page" },
+    details: { source: "page" }, // This is valid Prisma.InputJsonValue
   });
 
   const raw = identity.contextualNameDetails;

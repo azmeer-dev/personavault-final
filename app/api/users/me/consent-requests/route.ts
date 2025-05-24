@@ -42,6 +42,9 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    if (consentRequests.length > 0) {
+      console.log(`[GET /api/users/me/consent-requests] First request keys: ${Object.keys(consentRequests[0]).join(', ')}, App keys: ${Object.keys(consentRequests[0].app).join(', ')}, Identity keys: ${consentRequests[0].identity ? Object.keys(consentRequests[0].identity).join(', ') : 'N/A'}`);
+    }
     return NextResponse.json(consentRequests);
   } catch (error) {
     console.error('Error fetching consent requests:', error);

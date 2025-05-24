@@ -37,6 +37,9 @@ export async function GET(req: NextRequest) {
     });
 
     console.log(`[GET /api/users/me/apps] Found ${apps.length} apps for user ${userId}`);
+    if (apps.length > 0) {
+      console.log(`[GET /api/users/me/apps] Returning user's apps. First app keys: ${Object.keys(apps[0]).join(', ')}`);
+    }
     return NextResponse.json(apps);
 
   } catch (error) {
