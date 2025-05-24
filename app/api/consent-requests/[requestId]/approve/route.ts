@@ -1,83 +1,93 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import prisma from '@/lib/prisma';
-import { ConsentRequestStatus } from '@prisma/client';
-import { createAuditLog } from '@/lib/audit'; // Added
-import { AuditActorType, AuditLogOutcome } from '@prisma/client'; // Added
+import { ConsentRequestStatus, AuditActorType, AuditLogOutcome, ConsentRequest } from '@prisma/client';
+import { createAuditLog } from '@/lib/audit';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 const SECRET = process.env.NEXTAUTH_SECRET;
 
 export async function POST(
   req: NextRequest,
   { params }: { params: { requestId: string } }
-) {
+): Promise<NextResponse> {
+  const { requestId } = params;
+  const token = await getToken({ req, secret: SECRET });
+
+  if (!token || !token.sub) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const userId: string = token.sub;
+
+  if (!requestId) {
+    await createAuditLog({
+      actorType: AuditActorType.USER,
+      actorUserId: userId,
+      action: 'APPROVE_CONSENT_REQUEST_FAILURE',
+      outcome: AuditLogOutcome.FAILURE,
+      details: { error: 'Bad Request: requestId is required' },
+    });
+    return NextResponse.json({ error: 'Bad Request: requestId is required' }, { status: 400 });
+  }
+
+  let consentRequest: (ConsentRequest & { app: { id: string; name: string } }) | null = null;
+
   try {
-    const token = await getToken({ req, secret: SECRET });
-    if (!token || !token.sub) {
-      // No audit log here, no user context
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const userId = token.sub;
-    const { requestId } = params;
-
-    if (!requestId) {
-      const errorMsg = 'Bad Request: requestId is required';
-      // No specific target for audit log here if requestId is missing
-      await createAuditLog({
-        actorType: AuditActorType.USER, actorUserId: userId, action: "APPROVE_CONSENT_REQUEST_FAILURE",
-        outcome: AuditLogOutcome.FAILURE, details: { error: errorMsg }
-      });
-      return NextResponse.json({ error: errorMsg }, { status: 400 });
-    }
-
-    const consentRequest = await prisma.consentRequest.findUnique({
+    consentRequest = await prisma.consentRequest.findUnique({
       where: { id: requestId },
-      include: { 
-        app: { select: { id: true, name: true }} // Include app name for logging
-      }
+      include: {
+        app: { select: { id: true, name: true } },
+      },
     });
 
     if (!consentRequest) {
-      const errorMsg = 'ConsentRequest not found';
       await createAuditLog({
-        actorType: AuditActorType.USER, actorUserId: userId, action: "APPROVE_CONSENT_REQUEST_FAILURE",
-        targetEntityType: "ConsentRequest", targetEntityId: requestId, outcome: AuditLogOutcome.FAILURE,
-        details: { error: errorMsg }
+        actorType: AuditActorType.USER,
+        actorUserId: userId,
+        action: 'APPROVE_CONSENT_REQUEST_FAILURE',
+        targetEntityType: 'ConsentRequest',
+        targetEntityId: requestId,
+        outcome: AuditLogOutcome.FAILURE,
+        details: { error: 'ConsentRequest not found' },
       });
-      return NextResponse.json({ error: errorMsg }, { status: 404 });
+      return NextResponse.json({ error: 'ConsentRequest not found' }, { status: 404 });
     }
 
     if (consentRequest.targetUserId !== userId) {
-      const errorMsg = 'Forbidden: You are not the target user for this request';
       await createAuditLog({
-        actorType: AuditActorType.USER, actorUserId: userId, action: "APPROVE_CONSENT_REQUEST_FAILURE",
-        targetEntityType: "ConsentRequest", targetEntityId: requestId, outcome: AuditLogOutcome.FAILURE,
-        details: { error: errorMsg, appId: consentRequest.appId, actualTargetUserId: consentRequest.targetUserId }
+        actorType: AuditActorType.USER,
+        actorUserId: userId,
+        action: 'APPROVE_CONSENT_REQUEST_FAILURE',
+        targetEntityType: 'ConsentRequest',
+        targetEntityId: requestId,
+        outcome: AuditLogOutcome.FAILURE,
+        details: {
+          error: 'Forbidden: You are not the target user for this request',
+          appId: consentRequest.appId,
+          actualTargetUserId: consentRequest.targetUserId,
+        },
       });
-      return NextResponse.json({ error: errorMsg }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     if (consentRequest.status !== ConsentRequestStatus.PENDING) {
       const errorMsg = `Bad Request: ConsentRequest is already ${consentRequest.status.toLowerCase()}`;
       await createAuditLog({
-        actorType: AuditActorType.USER, actorUserId: userId, action: "APPROVE_CONSENT_REQUEST_FAILURE",
-        targetEntityType: "ConsentRequest", targetEntityId: requestId, outcome: AuditLogOutcome.FAILURE,
-        details: { error: errorMsg, appId: consentRequest.appId, currentStatus: consentRequest.status }
+        actorType: AuditActorType.USER,
+        actorUserId: userId,
+        action: 'APPROVE_CONSENT_REQUEST_FAILURE',
+        targetEntityType: 'ConsentRequest',
+        targetEntityId: requestId,
+        outcome: AuditLogOutcome.FAILURE,
+        details: {
+          error: errorMsg,
+          appId: consentRequest.appId,
+          currentStatus: consentRequest.status,
+        },
       });
       return NextResponse.json({ error: errorMsg }, { status: 400 });
     }
-    
-    if (!consentRequest.appId) {
-        const errorMsg = 'Internal Server Error: App ID missing from consent request.';
-        console.error(`[ApproveConsentRequest] ConsentRequest ${requestId} is missing appId.`);
-        await createAuditLog({
-            actorType: AuditActorType.USER, actorUserId: userId, action: "APPROVE_CONSENT_REQUEST_FAILURE",
-            targetEntityType: "ConsentRequest", targetEntityId: requestId, outcome: AuditLogOutcome.FAILURE,
-            details: { error: errorMsg, reason: "ConsentRequest.appId is null or undefined." }
-        });
-        return NextResponse.json({ error: errorMsg }, { status: 500 });
-    }
-
 
     const now = new Date();
 
@@ -90,79 +100,88 @@ export async function POST(
         },
       });
 
-      const consentUpsertData = {
-        userId: userId,
-        appId: consentRequest.appId!, // Not null due to check above
-        identityId: consentRequest.identityId, 
-        grantedScopes: consentRequest.requestedScopes,
-        grantedAt: now,
-        expiresAt: null, 
-        revokedAt: null, 
-        lastUsedAt: null,
-      };
-      
-      const createdOrUpdatedConsent = await tx.consent.upsert({
+      const existingConsent = await tx.consent.findFirst({
         where: {
-          userId_appId_identityId: {
-            userId: userId,
-            appId: consentRequest.appId!, // Not null
-            identityId: consentRequest.identityId, 
-          }
-        },
-        create: consentUpsertData,
-        update: {
-          grantedScopes: consentRequest.requestedScopes,
-          grantedAt: now, 
-          revokedAt: null, 
-          expiresAt: null, 
+          userId: userId,
+          appId: consentRequest!.appId,
+          identityId: consentRequest!.identityId,
         },
       });
+
+      const createdOrUpdatedConsent = existingConsent
+        ? await tx.consent.update({
+            where: { id: existingConsent.id },
+            data: {
+              grantedScopes: consentRequest!.requestedScopes,
+              grantedAt: now,
+              revokedAt: null,
+              expiresAt: null,
+            },
+          })
+        : await tx.consent.create({
+            data: {
+              userId: userId,
+              appId: consentRequest!.appId,
+              identityId: consentRequest!.identityId,
+              grantedScopes: consentRequest!.requestedScopes,
+              grantedAt: now,
+              revokedAt: null,
+              expiresAt: null,
+            },
+          });
 
       return { updatedRequest, createdOrUpdatedConsent };
     });
 
     await createAuditLog({
-      actorType: AuditActorType.USER, actorUserId: userId, action: "APPROVE_CONSENT_REQUEST",
-      targetEntityType: "ConsentRequest", targetEntityId: requestId, outcome: AuditLogOutcome.SUCCESS,
-      details: { 
-        appId: consentRequest.appId, 
-        identityId: consentRequest.identityId, 
-        scopes: consentRequest.requestedScopes, 
+      actorType: AuditActorType.USER,
+      actorUserId: userId,
+      action: 'APPROVE_CONSENT_REQUEST',
+      targetEntityType: 'ConsentRequest',
+      targetEntityId: requestId,
+      outcome: AuditLogOutcome.SUCCESS,
+      details: {
+        appId: consentRequest.appId,
+        identityId: consentRequest.identityId,
+        scopes: consentRequest.requestedScopes,
         createdConsentId: result.createdOrUpdatedConsent.id,
-        appName: consentRequest.app.name // Added app name from included relation
-      }
+        appName: consentRequest.app.name,
+      },
     });
-    return NextResponse.json(result.createdOrUpdatedConsent);
 
-  } catch (error: any) { // Typed error
-    const auditActorUserId = userId || token?.sub; // Ensure userId is available for logging
-    console.error(`Error approving consent request ${requestId} for user ${auditActorUserId || 'unknown'}:`, error);
-    
-    let specificErrorMessage = 'Internal Server Error';
-    let statusCode = 500;
-    const errorDetails: any = { 
-        error: error.message || "Unknown error during consent approval", 
-        requestId: requestId, 
-        appId: consentRequest?.appId, // consentRequest might be undefined if error is very early
-        identityId: consentRequest?.identityId,
-        code: error.code
+    return NextResponse.json(result.createdOrUpdatedConsent);
+  } catch (err) {
+    const error = err as Error | PrismaClientKnownRequestError;
+    console.error(`Error approving consent request ${requestId} for user ${userId}:`, error);
+
+    const isPrisma = error instanceof PrismaClientKnownRequestError;
+    const code = isPrisma ? error.code : undefined;
+    const details = {
+      error: error.message,
+      requestId,
+      appId: consentRequest?.appId,
+      identityId: consentRequest?.identityId,
+      code,
     };
 
-    if (error instanceof prisma.PrismaClientKnownRequestError) {
-        if (error.code === 'P2003') { // Foreign key constraint failed
-             specificErrorMessage = 'Bad Request: Invalid data provided for consent (e.g., App ID does not exist).';
-             statusCode = 400;
-             errorDetails.reason = specificErrorMessage;
-        }
+    let statusCode = 500;
+    let errorMessage = 'Internal Server Error';
+
+    if (isPrisma && error.code === 'P2003') {
+      statusCode = 400;
+      errorMessage = 'Bad Request: Invalid data provided for consent (e.g., App ID does not exist).';
     }
-    
-    if (auditActorUserId) {
-        await createAuditLog({
-            actorType: AuditActorType.USER, actorUserId: auditActorUserId, action: "APPROVE_CONSENT_REQUEST_FAILURE",
-            targetEntityType: "ConsentRequest", targetEntityId: requestId, outcome: AuditLogOutcome.FAILURE,
-            details: errorDetails
-        });
-    }
-    return NextResponse.json({ error: specificErrorMessage }, { status: statusCode });
+
+    await createAuditLog({
+      actorType: AuditActorType.USER,
+      actorUserId: userId,
+      action: 'APPROVE_CONSENT_REQUEST_FAILURE',
+      targetEntityType: 'ConsentRequest',
+      targetEntityId: requestId,
+      outcome: AuditLogOutcome.FAILURE,
+      details,
+    });
+
+    return NextResponse.json({ error: errorMessage }, { status: statusCode });
   }
 }

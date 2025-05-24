@@ -6,8 +6,10 @@ import prisma from '@/lib/prisma';
 const SECRET = process.env.NEXTAUTH_SECRET;
 
 export async function GET(req: NextRequest) {
+
+  let token;
   try {
-    const token = await getToken({ req, secret: SECRET });
+    token = await getToken({ req, secret: SECRET });
     if (!token || !token.sub) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

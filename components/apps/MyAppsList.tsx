@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Info, AlertTriangle, Settings, Copy, Check } from 'lucide-react'; // Icons, Added Copy and Check
+import { Badge } from '../ui/badge';
 
 interface AppData {
   id: string;

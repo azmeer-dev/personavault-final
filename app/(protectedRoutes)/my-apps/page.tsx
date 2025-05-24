@@ -25,7 +25,7 @@ export default async function MyAppsPage() {
             </p>
         </div>
         <Link href="/my-apps/new" passHref legacyBehavior>
-          <Button as="a"> {/* Use 'as="a"' for Next.js Link with Button component */}
+          <Button> {/* Use 'as="a"' for Next.js Link with Button component */}
             <PlusCircle className="mr-2 h-4 w-4" />
             Register New App
           </Button>

@@ -1,30 +1,63 @@
-'use client';
+"use client";
 
-import { useForm, useFieldArray } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { useRouter } from 'next/navigation'; // Corrected import for App Router
-import { useState } from 'react';
+import { useForm, useFieldArray } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea'; // Added Textarea import
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Trash2, PlusCircle, Loader2, CheckCircle } from 'lucide-react'; // Icons
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Trash2, PlusCircle, Loader2, CheckCircle } from "lucide-react";
 
-// Zod schema for form validation
+// zod schema for form validation
 export const newAppSchema = z.object({
   name: z.string().min(3, { message: "App name must be at least 3 characters." }),
-  description: z.string().max(500, { message: "Description cannot exceed 500 characters."}).optional(),
-  websiteUrl: z.string().url({ message: "Invalid URL format. Please include http(s)://" }).optional().or(z.literal('')),
-  logoUrl: z.string().url({ message: "Invalid URL format. Please include http(s)://" }).optional().or(z.literal('')),
-  redirectUris: z.array(
-      z.string().url({ message: "Each redirect URI must be a valid URL. e.g., https://myapp.com/callback" })
-    ).min(1, { message: "At least one redirect URI is required." })
-    .max(5, { message: "You can add a maximum of 5 redirect URIs."}), // Added max for sensibility
-  privacyPolicyUrl: z.string().url({ message: "Invalid URL format. Please include http(s)://" }).optional().or(z.literal('')),
-  termsOfServiceUrl: z.string().url({ message: "Invalid URL format. Please include http(s)://" }).optional().or(z.literal('')),
+  description: z
+    .string()
+    .max(500, { message: "Description cannot exceed 500 characters." })
+    .optional(),
+  websiteUrl: z
+    .string()
+    .url({ message: "Invalid URL format. Please include http(s)://" })
+    .optional()
+    .or(z.literal("")),
+  logoUrl: z
+    .string()
+    .url({ message: "Invalid URL format. Please include http(s)://" })
+    .optional()
+    .or(z.literal("")),
+  redirectUris: z
+    .array(
+      z.object({
+        url: z.string().url({
+          message: "Each redirect URI must be a valid URL. e.g., https://myapp.com/callback",
+        }),
+      })
+    )
+    .min(1, { message: "At least one redirect URI is required." })
+    .max(5, { message: "You can add a maximum of 5 redirect URIs." }),
+  privacyPolicyUrl: z
+    .string()
+    .url({ message: "Invalid URL format. Please include http(s)://" })
+    .optional()
+    .or(z.literal("")),
+  termsOfServiceUrl: z
+    .string()
+    .url({ message: "Invalid URL format. Please include http(s)://" })
+    .optional()
+    .or(z.literal("")),
 });
 
 type NewAppFormValues = z.infer<typeof newAppSchema>;
@@ -38,19 +71,23 @@ export default function CreateAppForm() {
   const form = useForm<NewAppFormValues>({
     resolver: zodResolver(newAppSchema),
     defaultValues: {
-      name: '',
-      description: '',
-      websiteUrl: '',
-      logoUrl: '',
-      redirectUris: [''], // Start with one empty redirect URI field
-      privacyPolicyUrl: '',
-      termsOfServiceUrl: '',
+      name: "",
+      description: "",
+      websiteUrl: "",
+      logoUrl: "",
+      redirectUris: [{ url: "" }],
+      privacyPolicyUrl: "",
+      termsOfServiceUrl: "",
     },
   });
 
-  const { fields: redirectUriFields, append: appendRedirectUri, remove: removeRedirectUri } = useFieldArray({
+  const {
+    fields: redirectUriFields,
+    append: appendRedirectUri,
+    remove: removeRedirectUri,
+  } = useFieldArray<NewAppFormValues, "redirectUris", "id">({
     control: form.control,
-    name: 'redirectUris',
+    name: "redirectUris",
   });
 
   async function onSubmit(values: NewAppFormValues) {
@@ -59,9 +96,9 @@ export default function CreateAppForm() {
     setSubmitSuccess(null);
 
     try {
-      const response = await fetch('/api/apps', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/apps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
       });
 
@@ -70,17 +107,14 @@ export default function CreateAppForm() {
       if (!response.ok) {
         throw new Error(responseData.error || `Server error: ${response.status}`);
       }
-      
+
       setSubmitSuccess(`Application "${responseData.name}" registered successfully! Redirecting...`);
-      form.reset(); // Reset form on success
-
-      // Redirect to the new app's settings page
+      form.reset();
       router.push(`/my-apps/${responseData.id}/settings`);
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
       setSubmitError(errorMessage);
-      console.error("App registration failed:", errorMessage);
+      console.error("app registration failed:", errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -89,15 +123,17 @@ export default function CreateAppForm() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        {/* Global Success Message */}
         {submitSuccess && (
-          <Alert variant="default" className="bg-green-50 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400">
-             <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
+          <Alert
+            variant="default"
+            className="bg-green-50 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400"
+          >
+            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
             <AlertTitle>Success!</AlertTitle>
             <AlertDescription>{submitSuccess}</AlertDescription>
           </Alert>
         )}
-        {/* Global Error Message */}
+
         {submitError && (
           <Alert variant="destructive">
             <AlertTitle>Registration Failed</AlertTitle>
@@ -110,11 +146,13 @@ export default function CreateAppForm() {
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Application Name <span className="text-destructive">*</span></FormLabel>
+              <FormLabel>
+                Application Name <span className="text-destructive">*</span>
+              </FormLabel>
               <FormControl>
                 <Input placeholder="My Awesome App" {...field} />
               </FormControl>
-              <FormDescription>A unique name for your application.</FormDescription>
+              <FormDescription>a unique name for your application</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -127,61 +165,58 @@ export default function CreateAppForm() {
             <FormItem>
               <FormLabel>Description</FormLabel>
               <FormControl>
-                <Textarea placeholder="Describe what your application does." {...field} rows={3} />
+                <Textarea placeholder="describe what your application does" rows={3} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        
-        {/* Redirect URIs - Dynamic Field Array */}
+
         <div>
-          <FormLabel>Redirect URIs <span className="text-destructive">*</span></FormLabel>
+          <FormLabel>
+            Redirect URIs <span className="text-destructive">*</span>
+          </FormLabel>
           <FormDescription className="text-sm mb-2">
-            These are the URLs where users will be redirected after successful authentication.
-            You must provide at least one. All must be valid HTTPS URLs.
+            these are the urls where users will be redirected after successful authentication
           </FormDescription>
+
           {redirectUriFields.map((field, index) => (
             <FormField
               key={field.id}
               control={form.control}
-              name={`redirectUris.${index}`}
+              name={`redirectUris.${index}.url`}
               render={({ field: itemField }) => (
                 <FormItem className="flex items-center space-x-2 mb-2">
                   <FormControl>
                     <Input placeholder="https://myapp.com/auth/callback" {...itemField} />
                   </FormControl>
                   {redirectUriFields.length > 1 && (
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeRedirectUri(index)} title="Remove URI">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeRedirectUri(index)}
+                      title="remove uri"
+                    >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   )}
-                  <FormMessage className="ml-2" /> {/* Ensure message is shown per field */}
+                  <FormMessage className="ml-2" />
                 </FormItem>
               )}
             />
           ))}
+
           <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => appendRedirectUri('')}
-            disabled={redirectUriFields.length >= 5} // Max 5 URIs
+            onClick={() => appendRedirectUri({ url: "" })}
+            disabled={redirectUriFields.length >= 5}
           >
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Redirect URI
+            <PlusCircle className="mr-2 h-4 w-4" /> add redirect uri
           </Button>
-           {form.formState.errors.redirectUris && !form.formState.errors.redirectUris.root?.message && form.formState.errors.redirectUris.message && (
-            <p className="text-sm font-medium text-destructive mt-2">
-              {form.formState.errors.redirectUris.message}
-            </p>
-          )}
-           {form.formState.errors.redirectUris?.root?.message && (
-             <p className="text-sm font-medium text-destructive mt-2">
-                {form.formState.errors.redirectUris.root.message}
-            </p>
-           )}
         </div>
-
 
         <FormField
           control={form.control}
@@ -206,12 +241,12 @@ export default function CreateAppForm() {
               <FormControl>
                 <Input placeholder="https://myawesomeapp.com/logo.png" {...field} />
               </FormControl>
-              <FormDescription>A direct link to your application's logo (PNG, JPG, SVG).</FormDescription>
+              <FormDescription>a direct link to your application&apos;s logo (png, jpg, svg)</FormDescription>
               <FormMessage />
             </FormItem>
           )}
         />
-        
+
         <FormField
           control={form.control}
           name="privacyPolicyUrl"
@@ -244,10 +279,10 @@ export default function CreateAppForm() {
           {isSubmitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Registering...
+              registering...
             </>
           ) : (
-            'Register Application'
+            "Register Application"
           )}
         </Button>
       </form>
