@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
         // consentScopes: { include: { scope: true } }
       },
       orderBy: {
-        grantedAt: 'desc', // Show newest consents first
+        createdAt: 'desc', // Show newest consents first
       },
     });
 

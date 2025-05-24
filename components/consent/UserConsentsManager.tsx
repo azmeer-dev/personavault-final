@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ExternalLink, ShieldAlert, Info, Trash2, Loader2 } from 'lucide-react'; // Icons
+import { ExternalLink, ShieldAlert, ShieldCheck, Info, Trash2, Loader2 } from 'lucide-react'; // Icons
 
 // Type definitions based on expected API response
 interface AppInfo {
@@ -47,7 +47,7 @@ const formatDate = (dateString: string | null | undefined): string => {
       minute: '2-digit',
     });
   } catch (e) {
-    return 'Invalid Date' + e;
+    return 'Invalid Date';
   }
 };
 
