@@ -3,7 +3,6 @@
 
 import Image from "next/image";
 import { capitalize } from '../../lib/capitalize';
-import Link from "next/link";
 
 interface FullIdentityViewProps {
   data: {
@@ -106,7 +105,6 @@ export default function FullIdentityView({ data }: FullIdentityViewProps) {
             <a href={websiteUrls[0]} className="text-primary underline">
               {websiteUrls[0].replace(/^https?:\/\//, "")}
             </a>
-            <Link href={websiteUrls[0]}>{websiteUrls[0].replace(/^https?:\/\//, "")}</Link>
           </p>
         )}
          {linkedAccountEmails && linkedAccountEmails.length > 0 && (

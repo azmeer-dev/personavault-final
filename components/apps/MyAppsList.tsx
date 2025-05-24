@@ -1,14 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react'; // Added useCallback
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
-import { Info, AlertTriangle, Settings } from 'lucide-react'; // Icons
+import { Info, AlertTriangle, Settings, Copy, Check } from 'lucide-react'; // Icons, Added Copy and Check
 
 interface AppData {
   id: string;
@@ -23,6 +22,18 @@ export default function MyAppsList() {
   const [apps, setApps] = useState<AppData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [copiedAppId, setCopiedAppId] = useState<string | null>(null); // State for copy feedback
+
+  const handleCopy = useCallback(async (appId: string) => {
+    try {
+      await navigator.clipboard.writeText(appId);
+      setCopiedAppId(appId);
+      setTimeout(() => setCopiedAppId(null), 2000); // Reset after 2 seconds
+    } catch (err) {
+      console.error("Failed to copy App ID:", err);
+      // Optionally, set an error state here to show feedback to the user
+    }
+  }, []);
 
   useEffect(() => {
     const fetchApps = async () => {
@@ -120,16 +131,35 @@ export default function MyAppsList() {
             </CardHeader>
             <CardContent className="py-2">
               {app.description ? (
-                <CardDescription className="line-clamp-3 text-sm"> {/* line-clamp to limit description lines */}
+                <CardDescription className="line-clamp-3 text-sm mb-3"> {/* line-clamp & margin-bottom */}
                   {app.description}
                 </CardDescription>
               ) : (
-                <CardDescription className="italic text-sm">No description provided.</CardDescription>
+                <CardDescription className="italic text-sm mb-3">No description provided.</CardDescription>
               )}
+              <div className="mt-auto"> {/* Push App ID to bottom of CardContent if description is short */}
+                <p className="text-xs font-medium text-muted-foreground">App ID</p>
+                <div className="flex items-center space-x-2 mt-1">
+                  <code className="text-xs p-1.5 bg-muted rounded-md break-all">{app.id}</code>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleCopy(app.id)}
+                    title="Copy App ID"
+                    className="h-8 w-8 flex-shrink-0" // Ensure consistent size
+                  >
+                    {copiedAppId === app.id ? (
+                      <Check className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </div>
-          <CardFooter className="pt-4"> {/* Added padding-top for separation */}
-            <Link href={`/my-apps/${app.id}/settings`} passHref className="w-full">
+          <CardFooter className="pt-4 border-t mt-2"> {/* Added border-t and margin-top */}
+            <Link href={`/my-apps/${app.id}/settings`} passHref legacyBehavior className="w-full">
               <Button variant="outline" className="w-full">
                 <Settings className="mr-2 h-4 w-4" />
                 Manage

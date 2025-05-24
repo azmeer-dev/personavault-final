@@ -1,0 +1,131 @@
+// app/api/identities/route.ts
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import prisma from "@/lib/prisma";
+import { z } from "zod";
+import {
+  IdentityCategoryType,
+  Prisma,
+} from "@prisma/client";
+
+const PayloadSchema = z
+  .object({
+    identityLabel:      z.string().min(1),
+    category:           z.string().min(1),
+    customCategoryName: z.string().optional(),
+    description:        z.string().optional(),
+    previousNames:      z.string().optional(),
+    religiousNames:     z.string().optional(),
+    visibility:         z.enum(["PUBLIC", "PRIVATE"]),
+    connectedAccountIds:z.array(z.string()).optional(),
+    adHocAccounts:      z
+      .array(
+        z.object({
+          provider: z.string().min(1),
+          info:     z.string().min(1),
+        })
+      )
+      .optional(),
+  })
+  .refine((d) => d.category !== "Custom" || !!d.customCategoryName, {
+    message: "Custom category required when category is Custom",
+    path: ["customCategoryName"],
+  });
+
+export async function POST(request: Request) {
+  // 1️⃣ Auth
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.id;
+
+  // 2️⃣ Parse & validate
+  const body = await request.json();
+  const parsed = PayloadSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { errors: parsed.error.flatten() },
+      { status: 422 }
+    );
+  }
+  const {
+    identityLabel,
+    category,
+    customCategoryName,
+    description,
+    visibility,
+    connectedAccountIds = [],
+    previousNames,
+    religiousNames,
+    adHocAccounts = [],
+  } = parsed.data;
+
+  // 3️⃣ Map to Prisma enum
+  const prismaCategory: IdentityCategoryType =
+    category === "Custom"
+      ? IdentityCategoryType.CUSTOM
+      : IdentityCategoryType[
+          category.toUpperCase() as keyof typeof IdentityCategoryType
+        ];
+
+  // 4️⃣ Build a plain JS object for JSON details
+  const details: Record<string, unknown> = {};
+  if (previousNames) {
+    details.previousNames = previousNames
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  if (religiousNames) {
+    details.religiousNames = religiousNames
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  if (adHocAccounts.length) {
+    details.adHocAccounts = adHocAccounts;
+  }
+
+  // 5️⃣ Create + link in a transaction
+  try {
+    const newIdentity = await prisma.$transaction(async (tx) => {
+      // a) prepare the unchecked create input
+      const createInput: Prisma.IdentityUncheckedCreateInput = {
+        userId,
+        identityLabel,
+        category: prismaCategory,
+        customCategoryName:
+          prismaCategory === IdentityCategoryType.CUSTOM
+            ? customCategoryName!
+            : null,
+        description,
+        visibility,
+        contextualNameDetails:
+          Object.keys(details).length > 0
+            ? (details as Prisma.InputJsonValue)
+            : Prisma.JsonNull,
+      };
+
+      const created = await tx.identity.create({ data: createInput });
+
+      // b) link accounts
+      if (connectedAccountIds.length) {
+        await tx.identityAccount.createMany({
+          data: connectedAccountIds.map((acctId) => ({
+            identityId: created.id,
+            accountId: acctId,
+          })),
+        });
+      }
+
+      return created;
+    });
+
+    return NextResponse.json({ success: true, id: newIdentity.id }, { status: 201 });
+  } catch (err) {
+    console.error("Create identity error:", err);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
