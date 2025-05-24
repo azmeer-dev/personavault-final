@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import prisma from '@/lib/prisma';
 import { ConsentRequestStatus } from '@prisma/client'; // Import enum for status
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 const SECRET = process.env.NEXTAUTH_SECRET;
 
@@ -49,7 +48,7 @@ export async function POST(
     return NextResponse.json(updatedRequest);
   } catch (error) {
     console.error('Error rejecting consent request:', error);
-    if (error instanceof PrismaClientKnownRequestError && error.code === 'P2025') {
+    if (error instanceof prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
         return NextResponse.json({ error: 'ConsentRequest not found during update' }, { status: 404 });
     }
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
