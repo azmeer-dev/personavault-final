@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import prisma from '@/lib/prisma';
+import { createAuditLog } from '@/lib/audit'; // Added
+import { AuditActorType, AuditLogOutcome } from '@prisma/client'; // Added
 // import { z } from 'zod'; // Zod not used for this basic implementation
 
 const SECRET = process.env.NEXTAUTH_SECRET;
@@ -22,6 +24,7 @@ export async function POST(req: NextRequest) {
     const token = await getToken({ req, secret: SECRET });
     if (!token || !token.sub) {
       console.log('[POST /api/apps] Unauthorized: No token or token.sub');
+      // No audit log here as we don't have a userId to associate with the attempt
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const userId = token.sub;
@@ -30,27 +33,39 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     // Basic validation
+    const validationErrorDetails = { providedName: body.name, providedRedirectUris: body.redirectUris, inputBody: body }; // For audit
+
     if (!body.name || typeof body.name !== 'string' || body.name.trim() === '') {
-      console.log('[POST /api/apps] Validation failed: Name is required.');
-      return NextResponse.json({ error: 'Name is required.' }, { status: 400 });
+      const errorMsg = 'Name is required.';
+      console.log(`[POST /api/apps] Validation failed: ${errorMsg}`);
+      await createAuditLog({
+        actorType: AuditActorType.USER, actorUserId: userId, action: "CREATE_APP_VALIDATION_FAILURE",
+        outcome: AuditLogOutcome.FAILURE, details: { ...validationErrorDetails, error: errorMsg }
+      });
+      return NextResponse.json({ error: errorMsg }, { status: 400 });
     }
-    if (!Array.isArray(body.redirectUris) || body.redirectUris.length === 0 || body.redirectUris.some((uri: any) => typeof uri !== 'string' || !isValidUrl(uri))) {
-      console.log('[POST /api/apps] Validation failed: redirectUris must be a non-empty array of valid URLs.');
-      return NextResponse.json({ error: 'redirectUris must be a non-empty array of valid URLs.' }, { status: 400 });
+    if (!Array.isArray(body.redirectUris) || body.redirectUris.length === 0 || body.redirectUris.some((uri: any) => typeof uri !== 'string' || uri.trim() === '' || !isValidUrl(uri))) {
+      const errorMsg = 'redirectUris must be a non-empty array of valid URLs.';
+      console.log(`[POST /api/apps] Validation failed: ${errorMsg}`);
+      await createAuditLog({
+        actorType: AuditActorType.USER, actorUserId: userId, action: "CREATE_APP_VALIDATION_FAILURE",
+        outcome: AuditLogOutcome.FAILURE, details: { ...validationErrorDetails, error: errorMsg }
+      });
+      return NextResponse.json({ error: errorMsg }, { status: 400 });
     }
 
     // Optional URL validations
-    if (!isValidUrl(body.websiteUrl)) {
-      return NextResponse.json({ error: 'Invalid websiteUrl format.' }, { status: 400 });
-    }
-    if (!isValidUrl(body.logoUrl)) {
-      return NextResponse.json({ error: 'Invalid logoUrl format.' }, { status: 400 });
-    }
-    if (!isValidUrl(body.privacyPolicyUrl)) {
-      return NextResponse.json({ error: 'Invalid privacyPolicyUrl format.' }, { status: 400 });
-    }
-    if (!isValidUrl(body.termsOfServiceUrl)) {
-      return NextResponse.json({ error: 'Invalid termsOfServiceUrl format.' }, { status: 400 });
+    const optionalFieldsToValidate: (keyof typeof body)[] = ['websiteUrl', 'logoUrl', 'privacyPolicyUrl', 'termsOfServiceUrl'];
+    for (const field of optionalFieldsToValidate) {
+        if (body[field] !== undefined && body[field] !== null && body[field] !== '' && !isValidUrl(body[field])) {
+            const errorMsg = `Invalid ${field} format.`;
+            console.log(`[POST /api/apps] Validation failed: ${errorMsg}`);
+            await createAuditLog({
+                actorType: AuditActorType.USER, actorUserId: userId, action: "CREATE_APP_VALIDATION_FAILURE",
+                outcome: AuditLogOutcome.FAILURE, details: { ...validationErrorDetails, error: errorMsg, field }
+            });
+            return NextResponse.json({ error: errorMsg }, { status: 400 });
+        }
     }
     
     console.log(`[POST /api/apps] Validation passed for app name: ${body.name}`);
@@ -79,21 +94,54 @@ export async function POST(req: NextRequest) {
         termsOfServiceUrl: true,
         isEnabled: true,
         createdAt: true,
+        updatedAt: true, // Added as per example
         ownerId: true, // To confirm ownership
       }
     });
 
     console.log(`[POST /api/apps] App created successfully with ID: ${newApp.id} for user ${userId}`);
+    
+    await createAuditLog({
+      actorType: AuditActorType.USER,
+      actorUserId: userId,
+      action: "CREATE_APP",
+      targetEntityType: "App",
+      targetEntityId: newApp.id,
+      outcome: AuditLogOutcome.SUCCESS,
+      details: { name: newApp.name, redirectUris: newApp.redirectUris, websiteUrl: newApp.websiteUrl } 
+    });
+    
+    console.log(`[POST /api/apps] Returning created app. Keys: ${Object.keys(newApp).join(', ')}`);
     // Reminder: In a real development environment, after modifying `prisma/schema.prisma`,
     // you would need to run `npx prisma generate` to update the Prisma Client and
     // `npx prisma migrate dev --name make_app_apikey_optional` (or similar) to create a new database migration.
     return NextResponse.json(newApp, { status: 201 });
 
   } catch (error: any) {
-    console.error(`[POST /api/apps] Failed to create app for user ${token?.sub || 'unknown'}:`, error);
+    // Use userId from outer scope if available, otherwise token.sub (which might be null if token itself is null)
+    const auditActorUserId = userId || token?.sub; 
+    console.error(`[POST /api/apps] Failed to create app for user ${auditActorUserId || 'unknown'}:`, error);
+
     if (error.code === 'P2002' && error.meta?.target?.includes('name')) {
-      console.log('[POST /api/apps] Conflict: App name already taken.');
-      return NextResponse.json({ error: 'App name already taken' }, { status: 409 });
+      const errorMsg = 'App name already taken';
+      console.log(`[POST /api/apps] Conflict: ${errorMsg}`);
+      if (auditActorUserId) { // Only log if we have a user to attribute it to
+        await createAuditLog({
+          actorType: AuditActorType.USER, actorUserId: auditActorUserId, action: "CREATE_APP_DB_FAILURE",
+          targetEntityType: "App", outcome: AuditLogOutcome.FAILURE,
+          details: { error: errorMsg, code: error.code, providedName: body?.name, inputBody: body }
+        });
+      }
+      return NextResponse.json({ error: errorMsg }, { status: 409 });
+    }
+
+    // Generic database or other error
+    if (auditActorUserId) { // Only log if we have a user to attribute it to
+        await createAuditLog({
+            actorType: AuditActorType.USER, actorUserId: auditActorUserId, action: "CREATE_APP_DB_FAILURE",
+            targetEntityType: "App", outcome: AuditLogOutcome.FAILURE,
+            details: { error: error.message || "Unknown database error", code: error.code || "UNKNOWN_DB_ERROR", inputBody: body }
+        });
     }
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
