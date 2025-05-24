@@ -1,8 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
-import prisma from "@/lib/prisma";
-import { ConsentRequestStatus } from "@prisma/client"; // Import enum for status
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import { NextRequest, NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
+import prisma from '@/lib/prisma';
+import { ConsentRequestStatus } from '@prisma/client'; // Import enum for status
 
 const SECRET = process.env.NEXTAUTH_SECRET;
 
@@ -13,61 +12,40 @@ export async function POST(
   try {
     const token = await getToken({ req, secret: SECRET });
     if (!token || !token.sub) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const userId = token.sub;
     const { requestId } = params;
 
     if (!requestId) {
-      return NextResponse.json(
-        { error: "Bad Request: requestId is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Bad Request: requestId is required' }, { status: 400 });
     }
 
     const consentRequest = await prisma.consentRequest.findUnique({
       where: { id: requestId },
-      include: {
-        // Include app to get appId for consent record
-        app: { select: { id: true } },
-      },
+      include: { // Include app to get appId for consent record
+        app: { select: { id: true }}
+      }
     });
 
     if (!consentRequest) {
-      return NextResponse.json(
-        { error: "ConsentRequest not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'ConsentRequest not found' }, { status: 404 });
     }
 
     if (consentRequest.targetUserId !== userId) {
-      return NextResponse.json(
-        { error: "Forbidden: You are not the target user for this request" },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'Forbidden: You are not the target user for this request' }, { status: 403 });
     }
 
     if (consentRequest.status !== ConsentRequestStatus.PENDING) {
-      return NextResponse.json(
-        {
-          error: `Bad Request: ConsentRequest is already ${consentRequest.status.toLowerCase()}`,
-        },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: `Bad Request: ConsentRequest is already ${consentRequest.status.toLowerCase()}` }, { status: 400 });
+    }
+    
+    if (!consentRequest.appId) {
+        // This case should ideally not happen if data integrity is maintained
+        console.error(`[ApproveConsentRequest] ConsentRequest ${requestId} is missing appId.`);
+        return NextResponse.json({ error: 'Internal Server Error: App ID missing from consent request.' }, { status: 500 });
     }
 
-    if (!consentRequest.appId) {
-      // This case should ideally not happen if data integrity is maintained
-      console.error(
-        `[ApproveConsentRequest] ConsentRequest ${requestId} is missing appId.`
-      );
-      return NextResponse.json(
-        {
-          error: "Internal Server Error: App ID missing from consent request.",
-        },
-        { status: 500 }
-      );
-    }
 
     const now = new Date();
 
@@ -90,7 +68,7 @@ export async function POST(
         revokedAt: null, // Ensure it's active
         lastUsedAt: null,
       };
-
+      
       // Prisma's unique constraint for Consent is userId_appId_identityId
       // If identityId is null, we need a different where clause for the upsert.
       // However, Prisma's compound unique index handles nulls as distinct values usually.
@@ -99,11 +77,11 @@ export async function POST(
 
       const createdOrUpdatedConsent = await tx.consent.upsert({
         where: {
-          UserAppIdentityConsent: {
+          userId_appId_identityId: {
             userId: userId,
             appId: consentRequest.appId,
-            identityId: consentRequest.identityId as string,
-          },
+            identityId: consentRequest.identityId, // This works even if identityId is null
+          }
         },
         create: consentUpsertData,
         update: {
@@ -120,20 +98,14 @@ export async function POST(
 
     return NextResponse.json(result.createdOrUpdatedConsent);
   } catch (error) {
-    console.error("Error approving consent request:", error);
+    console.error('Error approving consent request:', error);
     // Handle specific Prisma errors if necessary, e.g., transaction errors
-    if (error instanceof PrismaClientKnownRequestError) {
-      // Example: Foreign key constraint failed
-      if (error.code === "P2003") {
-        return NextResponse.json(
-          { error: "Bad Request: Invalid data provided for consent." },
-          { status: 400 }
-        );
-      }
+    if (error instanceof prisma.PrismaClientKnownRequestError) {
+        // Example: Foreign key constraint failed
+        if (error.code === 'P2003') {
+             return NextResponse.json({ error: 'Bad Request: Invalid data provided for consent.' }, { status: 400 });
+        }
     }
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
