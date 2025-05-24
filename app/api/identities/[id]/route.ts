@@ -83,7 +83,9 @@ export async function PUT(
   }
 }
 
-import { authenticateApp } from '@/lib/app-auth'; // Added import
+import { authenticateApp } from '@/lib/app-auth';
+import { createAuditLog } from '@/lib/audit'; // Ensure this is present
+import { AuditActorType, AuditLogOutcome } from '@prisma/client'; // Ensure this is present
 
 export async function GET(
   req: NextRequest,
@@ -129,7 +131,40 @@ export async function GET(
       // --- NEW LOGIC: Check for PUBLIC visibility first ---
       if (identity.visibility === 'PUBLIC') {
         console.log(`[GET /api/identities/${identityId}] Access to PUBLIC identity ${identity.id} granted to App ${authenticatedApp.id} via API key without specific consent.`);
-        return NextResponse.json(identity);
+        // Sanitize before returning
+        const sanitizedIdentity = {
+          id: identity.id,
+          identityLabel: identity.identityLabel,
+          category: identity.category,
+          customCategoryName: identity.customCategoryName,
+          description: identity.description,
+          contextualNameDetails: identity.contextualNameDetails,
+          genderIdentity: identity.genderIdentity,
+          customGenderDescription: identity.customGenderDescription,
+          pronouns: identity.pronouns,
+          dateOfBirth: identity.dateOfBirth,
+          location: identity.location,
+          profilePictureUrl: identity.profilePictureUrl,
+          identityContacts: identity.identityContacts,
+          onlinePresence: identity.onlinePresence,
+          websiteUrls: identity.websiteUrls,
+          additionalAttributes: identity.additionalAttributes,
+          visibility: identity.visibility,
+          createdAt: identity.createdAt,
+          updatedAt: identity.updatedAt,
+          // linkedExternalAccounts is NOT included
+          // userId is NOT included
+        };
+        await createAuditLog({
+          actorType: AuditActorType.APP, actorAppId: authenticatedApp.id, action: "READ_IDENTITY_API_SUCCESS",
+          targetEntityType: "Identity", targetEntityId: identity.id, outcome: AuditLogOutcome.SUCCESS,
+          details: { 
+            appName: authenticatedApp.name, identityLabel: identity.identityLabel, 
+            visibility: identity.visibility, grantedVia: 'public_access' 
+          }
+        });
+        console.log(`[GET /api/identities/${identityId}] Returning sanitized identity data to App ${authenticatedApp.id}. Keys: ${Object.keys(sanitizedIdentity).join(', ')}`);
+        return NextResponse.json(sanitizedIdentity);
       }
       // --- END NEW LOGIC ---
 
@@ -149,9 +184,49 @@ export async function GET(
         console.log(`[GET /api/identities/${identityId}] Found identity-specific consent ID: ${consent.id} for App ${authenticatedApp.id}`);
         if (consent.grantedScopes.includes(requiredScope)) {
           console.log(`[GET /api/identities/${identityId}] '${requiredScope}' scope validated in identity-specific consent for App ${authenticatedApp.id}. Returning identity.`);
-          return NextResponse.json(identity);
+          // Sanitize before returning
+          const sanitizedIdentity = {
+            id: identity.id,
+            identityLabel: identity.identityLabel,
+            category: identity.category,
+            customCategoryName: identity.customCategoryName,
+            description: identity.description,
+            contextualNameDetails: identity.contextualNameDetails,
+            genderIdentity: identity.genderIdentity,
+            customGenderDescription: identity.customGenderDescription,
+            pronouns: identity.pronouns,
+            dateOfBirth: identity.dateOfBirth,
+            location: identity.location,
+            profilePictureUrl: identity.profilePictureUrl,
+            identityContacts: identity.identityContacts,
+            onlinePresence: identity.onlinePresence,
+            websiteUrls: identity.websiteUrls,
+            additionalAttributes: identity.additionalAttributes,
+            visibility: identity.visibility,
+            createdAt: identity.createdAt,
+            updatedAt: identity.updatedAt,
+          };
+          console.log(`[GET /api/identities/${identityId}] Returning sanitized identity data to App ${authenticatedApp.id}. Keys: ${Object.keys(sanitizedIdentity).join(', ')}`);
+          await createAuditLog({
+            actorType: AuditActorType.APP, actorAppId: authenticatedApp.id, action: "READ_IDENTITY_API_SUCCESS",
+            targetEntityType: "Identity", targetEntityId: identity.id, outcome: AuditLogOutcome.SUCCESS,
+            details: { 
+              appName: authenticatedApp.name, identityLabel: identity.identityLabel, 
+              visibility: identity.visibility, grantedVia: `consent_specific_${consent.id}` 
+            }
+          });
+          return NextResponse.json(sanitizedIdentity);
         } else {
-          console.warn(`[GET /api/identities/${identityId}] Identity-specific consent found, but '${requiredScope}' scope missing for App ${authenticatedApp.id}.`);
+          const reason = "Identity-specific consent found but required scope was missing.";
+          console.warn(`[GET /api/identities/${identityId}] ${reason} for App ${authenticatedApp.id}.`);
+          await createAuditLog({
+            actorType: AuditActorType.APP, actorAppId: authenticatedApp.id, action: "READ_IDENTITY_API_DENIED",
+            targetEntityType: "Identity", targetEntityId: identity.id, outcome: AuditLogOutcome.FAILURE,
+            details: { 
+              appName: authenticatedApp.name, identityLabel: identity.identityLabel, 
+              errorReason: "consent_required", specificReason: reason, requiredScopes: [requiredScope], consentId: consent.id 
+            }
+          });
           return NextResponse.json({
             error: "consent_required",
             message: "Specific consent is required for this application to access the requested resource with the necessary permissions. Identity-specific consent found but required scope was missing.",
@@ -181,9 +256,49 @@ export async function GET(
         console.log(`[GET /api/identities/${identityId}] Found user-level consent ID: ${userLevelConsent.id} for App ${authenticatedApp.id} and user ${identity.userId}`);
         if (userLevelConsent.grantedScopes.includes(requiredScope)) {
           console.log(`[GET /api/identities/${identityId}] '${requiredScope}' scope validated in user-level consent for App ${authenticatedApp.id}. Returning identity.`);
-          return NextResponse.json(identity);
+          // Sanitize before returning
+          const sanitizedIdentity = {
+            id: identity.id,
+            identityLabel: identity.identityLabel,
+            category: identity.category,
+            customCategoryName: identity.customCategoryName,
+            description: identity.description,
+            contextualNameDetails: identity.contextualNameDetails,
+            genderIdentity: identity.genderIdentity,
+            customGenderDescription: identity.customGenderDescription,
+            pronouns: identity.pronouns,
+            dateOfBirth: identity.dateOfBirth,
+            location: identity.location,
+            profilePictureUrl: identity.profilePictureUrl,
+            identityContacts: identity.identityContacts,
+            onlinePresence: identity.onlinePresence,
+            websiteUrls: identity.websiteUrls,
+            additionalAttributes: identity.additionalAttributes,
+            visibility: identity.visibility,
+            createdAt: identity.createdAt,
+            updatedAt: identity.updatedAt,
+          };
+          console.log(`[GET /api/identities/${identityId}] Returning sanitized identity data to App ${authenticatedApp.id}. Keys: ${Object.keys(sanitizedIdentity).join(', ')}`);
+          await createAuditLog({
+            actorType: AuditActorType.APP, actorAppId: authenticatedApp.id, action: "READ_IDENTITY_API_SUCCESS",
+            targetEntityType: "Identity", targetEntityId: identity.id, outcome: AuditLogOutcome.SUCCESS,
+            details: { 
+              appName: authenticatedApp.name, identityLabel: identity.identityLabel, 
+              visibility: identity.visibility, grantedVia: `consent_user_${userLevelConsent.id}`
+            }
+          });
+          return NextResponse.json(sanitizedIdentity);
         } else {
-          console.warn(`[GET /api/identities/${identityId}] User-level consent found, but '${requiredScope}' scope missing for App ${authenticatedApp.id}.`);
+          const reason = "User-level consent found but required scope was missing.";
+          console.warn(`[GET /api/identities/${identityId}] ${reason} for App ${authenticatedApp.id}.`);
+          await createAuditLog({
+            actorType: AuditActorType.APP, actorAppId: authenticatedApp.id, action: "READ_IDENTITY_API_DENIED",
+            targetEntityType: "Identity", targetEntityId: identity.id, outcome: AuditLogOutcome.FAILURE,
+            details: { 
+              appName: authenticatedApp.name, identityLabel: identity.identityLabel, 
+              errorReason: "consent_required", specificReason: reason, requiredScopes: [requiredScope], consentId: userLevelConsent.id 
+            }
+          });
           return NextResponse.json({
             error: "consent_required",
             message: "Specific consent is required for this application to access the requested resource with the necessary permissions. User-level consent found but required scope was missing.",
@@ -197,7 +312,16 @@ export async function GET(
         }
       }
       
-      console.warn(`[GET /api/identities/${identityId}] No valid (identity-specific or user-level) consent with '${requiredScope}' scope found for App ${authenticatedApp.id}.`);
+      const reason = "No valid (identity-specific or user-level) consent with required scope found.";
+      console.warn(`[GET /api/identities/${identityId}] ${reason} for App ${authenticatedApp.id}.`);
+      await createAuditLog({
+        actorType: AuditActorType.APP, actorAppId: authenticatedApp.id, action: "READ_IDENTITY_API_DENIED",
+        targetEntityType: "Identity", targetEntityId: identity.id, outcome: AuditLogOutcome.FAILURE,
+        details: { 
+          appName: authenticatedApp.name, identityLabel: identity.identityLabel, 
+          errorReason: "consent_required", specificReason: reason, requiredScopes: [requiredScope] 
+        }
+      });
       return NextResponse.json({
         error: "consent_required",
         message: "Specific consent is required for this application to access the requested resource with the necessary permissions. No active consent record found granting the required scope.",

@@ -40,6 +40,9 @@ export async function GET(req: NextRequest) {
     });
 
     console.log(`[GET /api/apps/connectable] Found ${connectableApps.length} connectable apps for user ${userId}`);
+    if (connectableApps.length > 0) {
+      console.log(`[GET /api/apps/connectable] Returning connectable apps. First app keys: ${Object.keys(connectableApps[0]).join(', ')}`);
+    }
     return NextResponse.json(connectableApps);
 
   } catch (error) {
