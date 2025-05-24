@@ -79,17 +79,11 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async signIn({ user, account, profile, isNewUser }) { // Added account, profile, isNewUser
+    async signIn(params) {
+      const {user, account} = params
+      const isNewUser = (params as { isNewUser?: boolean }).isNewUser ?? false;
+      // Added account, profile, isNewUser
       console.log("NextAuth signIn callback:", { userEmail: user?.email, provider: account?.provider, isNewUser });
-
-      // Existing complex logic for Google provider (from provided file example, slightly adapted)
-      // This section appears to be more suited for the jwt callback or linkAccount event based on its functionality.
-      // However, if it's intended to run *during* signIn to prevent sign-in, it stays.
-      // For this task, I'll keep it as is and add audit logging after it.
-      // The original file's signIn was very simple: console.log(user); return true;
-      // The conceptual snippet implies more complex logic might be here.
-      // The actual file provided in read_files had only console.log(user) and return true.
-      // I will proceed by adding the audit log based on the simple structure from read_files.
 
       if (user && user.id) {
         try {
@@ -243,7 +237,7 @@ export const authOptions: NextAuthOptions = {
         }
       }
     },
-    async signOut({ token, session }) { // token contains JWT payload, session is the client session
+    async signOut({ token }) { // token contains JWT payload, session is the client session
       if (token && token.id) { // Use token.id as per how it's set in the jwt callback
         try {
           await createAuditLog({

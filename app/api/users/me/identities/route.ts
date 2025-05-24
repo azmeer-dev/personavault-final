@@ -7,8 +7,9 @@ const SECRET = process.env.NEXTAUTH_SECRET;
 
 export async function GET(req: NextRequest) {
   console.log('[GET /api/users/me/identities] Received request');
+  let token;
   try {
-    const token = await getToken({ req, secret: SECRET });
+    token = await getToken({ req, secret: SECRET });
     if (!token || !token.sub) {
       console.log('[GET /api/users/me/identities] Unauthorized: No token or token.sub');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

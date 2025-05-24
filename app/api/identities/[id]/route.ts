@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
-import prisma from '@/lib/prisma';
-import { identityFormSchema } from '@/schemas/identityFormSchema';
+import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
+import prisma from "@/lib/prisma";
+import { identityFormSchema } from "@/schemas/identityFormSchema";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
 const SECRET = process.env.NEXTAUTH_SECRET;
 
@@ -13,7 +14,7 @@ export async function PUT(
   const token = await getToken({ req, secret: SECRET });
 
   if (!token || !token.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
@@ -27,11 +28,14 @@ export async function PUT(
     });
 
     if (!existing) {
-      return NextResponse.json({ error: 'Identity not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: "Identity not found" },
+        { status: 404 }
+      );
     }
 
     if (existing.userId !== token.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Transaction: update identity and reset linked accounts
@@ -41,24 +45,24 @@ export async function PUT(
       const identityUpdate = await prismaTx.identity.update({
         where: { id: identityId },
         data: {
-          identityLabel:            data.identityLabel,
-          category:                 data.category,
-          customCategoryName:       data.customCategoryName,
-          description:              data.description,
-          contextualNameDetails:    data.contextualNameDetails,
-          identityNameHistory:      data.identityNameHistory,
+          identityLabel: data.identityLabel,
+          category: data.category,
+          customCategoryName: data.customCategoryName,
+          description: data.description,
+          contextualNameDetails: data.contextualNameDetails,
+          identityNameHistory: data.identityNameHistory,
           contextualReligiousNames: data.contextualReligiousNames,
-          genderIdentity:           data.genderIdentity,
-          customGenderDescription:  data.customGenderDescription,
-          pronouns:                 data.pronouns,
-          dateOfBirth:              data.dateOfBirth ? new Date(data.dateOfBirth) : null,
-          location:                 data.location,
-          profilePictureUrl:        data.profilePictureUrl,
-          identityContacts:         data.identityContacts,
-          onlinePresence:           data.onlinePresence,
-          websiteUrls:              data.websiteUrls,
-          additionalAttributes:     data.additionalAttributes,
-          visibility:               data.visibility,
+          genderIdentity: data.genderIdentity,
+          customGenderDescription: data.customGenderDescription,
+          pronouns: data.pronouns,
+          dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
+          location: data.location,
+          profilePictureUrl: data.profilePictureUrl,
+          identityContacts: data.identityContacts,
+          onlinePresence: data.onlinePresence,
+          websiteUrls: data.websiteUrls,
+          additionalAttributes: data.additionalAttributes,
+          visibility: data.visibility,
         },
       });
 
@@ -83,9 +87,9 @@ export async function PUT(
   }
 }
 
-import { authenticateApp } from '@/lib/app-auth';
-import { createAuditLog } from '@/lib/audit'; // Ensure this is present
-import { AuditActorType, AuditLogOutcome } from '@prisma/client'; // Ensure this is present
+import { authenticateApp } from "@/lib/app-auth";
+import { createAuditLog } from "@/lib/audit"; // Ensure this is present
+import { AuditActorType, AuditLogOutcome } from "@prisma/client"; // Ensure this is present
 
 export async function GET(
   req: NextRequest,
@@ -94,43 +98,58 @@ export async function GET(
   const identityId = params.id;
   console.log(`[GET /api/identities/${identityId}] Received request`);
 
-  const authHeader = req.headers.get('Authorization');
-  const appIdHeader = req.headers.get('X-App-ID');
+  const authHeader = req.headers.get("Authorization");
+  const appIdHeader = req.headers.get("X-App-ID");
   const requiredScope = "identity.read";
 
-  if (authHeader && authHeader.startsWith('Bearer ') && appIdHeader) {
-    console.log(`[GET /api/identities/${identityId}] Attempting API Key Auth via App ID ${appIdHeader}`);
+  if (authHeader && authHeader.startsWith("Bearer ") && appIdHeader) {
+    console.log(
+      `[GET /api/identities/${identityId}] Attempting API Key Auth via App ID ${appIdHeader}`
+    );
     const authResult = await authenticateApp(req);
 
     if (authResult.error) {
-      console.warn(`[GET /api/identities/${identityId}] API Key Auth failed for App ID ${appIdHeader}: ${authResult.error.status}`);
+      console.warn(
+        `[GET /api/identities/${identityId}] API Key Auth failed for App ID ${appIdHeader}: ${authResult.error.status}`
+      );
       return authResult.error;
     }
 
     if (authResult.app) {
       const authenticatedApp = authResult.app;
-      console.log(`[GET /api/identities/${identityId}] API Key validated for App: ${authenticatedApp.id}`);
+      console.log(
+        `[GET /api/identities/${identityId}] API Key validated for App: ${authenticatedApp.id}`
+      );
 
       const identity = await prisma.identity.findUnique({
         where: { id: identityId },
-        include: { 
+        include: {
           linkedExternalAccounts: {
             include: {
               account: true,
-            }
-          } 
+            },
+          },
         },
       });
 
       if (!identity) {
-        console.log(`[GET /api/identities/${identityId}] Identity not found for App ${authenticatedApp.id}`);
-        return NextResponse.json({ error: 'Identity not found' }, { status: 404 });
+        console.log(
+          `[GET /api/identities/${identityId}] Identity not found for App ${authenticatedApp.id}`
+        );
+        return NextResponse.json(
+          { error: "Identity not found" },
+          { status: 404 }
+        );
       }
-      console.log(`[GET /api/identities/${identityId}] Found identity for App ${authenticatedApp.id}, owner: ${identity.userId}, visibility: ${identity.visibility}`);
+      console.log(
+        `[GET /api/identities/${identityId}] Found identity for App ${authenticatedApp.id}, owner: ${identity.userId}, visibility: ${identity.visibility}`
+      );
 
       // --- NEW LOGIC: Check for PUBLIC visibility first ---
-      if (identity.visibility === 'PUBLIC') {
-        console.log(`[GET /api/identities/${identityId}] Access to PUBLIC identity ${identity.id} granted to App ${authenticatedApp.id} via API key without specific consent.`);
+      if (identity.visibility === "PUBLIC") {
+        console.log(
+          `[GET /api/identities/${identityId}] Access to PUBLIC identity ${identity.id} granted to App ${authenticatedApp.id} via API key without specific consent.`
+        );
         // Sanitize before returning
         const sanitizedIdentity = {
           id: identity.id,
@@ -156,22 +175,34 @@ export async function GET(
           // userId is NOT included
         };
         await createAuditLog({
-          actorType: AuditActorType.APP, actorAppId: authenticatedApp.id, action: "READ_IDENTITY_API_SUCCESS",
-          targetEntityType: "Identity", targetEntityId: identity.id, outcome: AuditLogOutcome.SUCCESS,
-          details: { 
-            appName: authenticatedApp.name, identityLabel: identity.identityLabel, 
-            visibility: identity.visibility, grantedVia: 'public_access' 
-          }
+          actorType: AuditActorType.APP,
+          actorAppId: authenticatedApp.id,
+          action: "READ_IDENTITY_API_SUCCESS",
+          targetEntityType: "Identity",
+          targetEntityId: identity.id,
+          outcome: AuditLogOutcome.SUCCESS,
+          details: {
+            appName: authenticatedApp.name,
+            identityLabel: identity.identityLabel,
+            visibility: identity.visibility,
+            grantedVia: "public_access",
+          },
         });
-        console.log(`[GET /api/identities/${identityId}] Returning sanitized identity data to App ${authenticatedApp.id}. Keys: ${Object.keys(sanitizedIdentity).join(', ')}`);
+        console.log(
+          `[GET /api/identities/${identityId}] Returning sanitized identity data to App ${
+            authenticatedApp.id
+          }. Keys: ${Object.keys(sanitizedIdentity).join(", ")}`
+        );
         return NextResponse.json(sanitizedIdentity);
       }
       // --- END NEW LOGIC ---
 
       // If not public, proceed with consent checks
-      console.log(`[GET /api/identities/${identityId}] Identity ${identity.id} is not public. Proceeding with consent check for App ${authenticatedApp.id}.`);
+      console.log(
+        `[GET /api/identities/${identityId}] Identity ${identity.id} is not public. Proceeding with consent check for App ${authenticatedApp.id}.`
+      );
       // 1. Check for identity-specific consent
-      let consent = await prisma.consent.findFirst({
+      const consent = await prisma.consent.findFirst({
         where: {
           appId: authenticatedApp.id,
           userId: identity.userId,
@@ -181,9 +212,13 @@ export async function GET(
       });
 
       if (consent) {
-        console.log(`[GET /api/identities/${identityId}] Found identity-specific consent ID: ${consent.id} for App ${authenticatedApp.id}`);
+        console.log(
+          `[GET /api/identities/${identityId}] Found identity-specific consent ID: ${consent.id} for App ${authenticatedApp.id}`
+        );
         if (consent.grantedScopes.includes(requiredScope)) {
-          console.log(`[GET /api/identities/${identityId}] '${requiredScope}' scope validated in identity-specific consent for App ${authenticatedApp.id}. Returning identity.`);
+          console.log(
+            `[GET /api/identities/${identityId}] '${requiredScope}' scope validated in identity-specific consent for App ${authenticatedApp.id}. Returning identity.`
+          );
           // Sanitize before returning
           const sanitizedIdentity = {
             id: identity.id,
@@ -206,40 +241,67 @@ export async function GET(
             createdAt: identity.createdAt,
             updatedAt: identity.updatedAt,
           };
-          console.log(`[GET /api/identities/${identityId}] Returning sanitized identity data to App ${authenticatedApp.id}. Keys: ${Object.keys(sanitizedIdentity).join(', ')}`);
+          console.log(
+            `[GET /api/identities/${identityId}] Returning sanitized identity data to App ${
+              authenticatedApp.id
+            }. Keys: ${Object.keys(sanitizedIdentity).join(", ")}`
+          );
           await createAuditLog({
-            actorType: AuditActorType.APP, actorAppId: authenticatedApp.id, action: "READ_IDENTITY_API_SUCCESS",
-            targetEntityType: "Identity", targetEntityId: identity.id, outcome: AuditLogOutcome.SUCCESS,
-            details: { 
-              appName: authenticatedApp.name, identityLabel: identity.identityLabel, 
-              visibility: identity.visibility, grantedVia: `consent_specific_${consent.id}` 
-            }
+            actorType: AuditActorType.APP,
+            actorAppId: authenticatedApp.id,
+            action: "READ_IDENTITY_API_SUCCESS",
+            targetEntityType: "Identity",
+            targetEntityId: identity.id,
+            outcome: AuditLogOutcome.SUCCESS,
+            details: {
+              appName: authenticatedApp.name,
+              identityLabel: identity.identityLabel,
+              visibility: identity.visibility,
+              grantedVia: `consent_specific_${consent.id}`,
+            },
           });
           return NextResponse.json(sanitizedIdentity);
         } else {
-          const reason = "Identity-specific consent found but required scope was missing.";
-          console.warn(`[GET /api/identities/${identityId}] ${reason} for App ${authenticatedApp.id}.`);
+          const reason =
+            "Identity-specific consent found but required scope was missing.";
+          console.warn(
+            `[GET /api/identities/${identityId}] ${reason} for App ${authenticatedApp.id}.`
+          );
           await createAuditLog({
-            actorType: AuditActorType.APP, actorAppId: authenticatedApp.id, action: "READ_IDENTITY_API_DENIED",
-            targetEntityType: "Identity", targetEntityId: identity.id, outcome: AuditLogOutcome.FAILURE,
-            details: { 
-              appName: authenticatedApp.name, identityLabel: identity.identityLabel, 
-              errorReason: "consent_required", specificReason: reason, requiredScopes: [requiredScope], consentId: consent.id 
-            }
-          });
-          return NextResponse.json({
-            error: "consent_required",
-            message: "Specific consent is required for this application to access the requested resource with the necessary permissions. Identity-specific consent found but required scope was missing.",
+            actorType: AuditActorType.APP,
+            actorAppId: authenticatedApp.id,
+            action: "READ_IDENTITY_API_DENIED",
+            targetEntityType: "Identity",
+            targetEntityId: identity.id,
+            outcome: AuditLogOutcome.FAILURE,
             details: {
-              appId: authenticatedApp.id,
-              resourceType: "identity",
-              resourceId: identity.id,
-              requiredScopes: [requiredScope]
-            }
-          }, { status: 403 });
+              appName: authenticatedApp.name,
+              identityLabel: identity.identityLabel,
+              errorReason: "consent_required",
+              specificReason: reason,
+              requiredScopes: [requiredScope],
+              consentId: consent.id,
+            },
+          });
+          return NextResponse.json(
+            {
+              error: "consent_required",
+              message:
+                "Specific consent is required for this application to access the requested resource with the necessary permissions. Identity-specific consent found but required scope was missing.",
+              details: {
+                appId: authenticatedApp.id,
+                resourceType: "identity",
+                resourceId: identity.id,
+                requiredScopes: [requiredScope],
+              },
+            },
+            { status: 403 }
+          );
         }
       } else {
-         console.log(`[GET /api/identities/${identityId}] No identity-specific consent found for App ${authenticatedApp.id}. Checking user-level consent.`);
+        console.log(
+          `[GET /api/identities/${identityId}] No identity-specific consent found for App ${authenticatedApp.id}. Checking user-level consent.`
+        );
       }
 
       // 2. Check for user-level consent (identityId is null)
@@ -253,9 +315,13 @@ export async function GET(
       });
 
       if (userLevelConsent) {
-        console.log(`[GET /api/identities/${identityId}] Found user-level consent ID: ${userLevelConsent.id} for App ${authenticatedApp.id} and user ${identity.userId}`);
+        console.log(
+          `[GET /api/identities/${identityId}] Found user-level consent ID: ${userLevelConsent.id} for App ${authenticatedApp.id} and user ${identity.userId}`
+        );
         if (userLevelConsent.grantedScopes.includes(requiredScope)) {
-          console.log(`[GET /api/identities/${identityId}] '${requiredScope}' scope validated in user-level consent for App ${authenticatedApp.id}. Returning identity.`);
+          console.log(
+            `[GET /api/identities/${identityId}] '${requiredScope}' scope validated in user-level consent for App ${authenticatedApp.id}. Returning identity.`
+          );
           // Sanitize before returning
           const sanitizedIdentity = {
             id: identity.id,
@@ -278,101 +344,162 @@ export async function GET(
             createdAt: identity.createdAt,
             updatedAt: identity.updatedAt,
           };
-          console.log(`[GET /api/identities/${identityId}] Returning sanitized identity data to App ${authenticatedApp.id}. Keys: ${Object.keys(sanitizedIdentity).join(', ')}`);
+          console.log(
+            `[GET /api/identities/${identityId}] Returning sanitized identity data to App ${
+              authenticatedApp.id
+            }. Keys: ${Object.keys(sanitizedIdentity).join(", ")}`
+          );
           await createAuditLog({
-            actorType: AuditActorType.APP, actorAppId: authenticatedApp.id, action: "READ_IDENTITY_API_SUCCESS",
-            targetEntityType: "Identity", targetEntityId: identity.id, outcome: AuditLogOutcome.SUCCESS,
-            details: { 
-              appName: authenticatedApp.name, identityLabel: identity.identityLabel, 
-              visibility: identity.visibility, grantedVia: `consent_user_${userLevelConsent.id}`
-            }
+            actorType: AuditActorType.APP,
+            actorAppId: authenticatedApp.id,
+            action: "READ_IDENTITY_API_SUCCESS",
+            targetEntityType: "Identity",
+            targetEntityId: identity.id,
+            outcome: AuditLogOutcome.SUCCESS,
+            details: {
+              appName: authenticatedApp.name,
+              identityLabel: identity.identityLabel,
+              visibility: identity.visibility,
+              grantedVia: `consent_user_${userLevelConsent.id}`,
+            },
           });
           return NextResponse.json(sanitizedIdentity);
         } else {
-          const reason = "User-level consent found but required scope was missing.";
-          console.warn(`[GET /api/identities/${identityId}] ${reason} for App ${authenticatedApp.id}.`);
+          const reason =
+            "User-level consent found but required scope was missing.";
+          console.warn(
+            `[GET /api/identities/${identityId}] ${reason} for App ${authenticatedApp.id}.`
+          );
           await createAuditLog({
-            actorType: AuditActorType.APP, actorAppId: authenticatedApp.id, action: "READ_IDENTITY_API_DENIED",
-            targetEntityType: "Identity", targetEntityId: identity.id, outcome: AuditLogOutcome.FAILURE,
-            details: { 
-              appName: authenticatedApp.name, identityLabel: identity.identityLabel, 
-              errorReason: "consent_required", specificReason: reason, requiredScopes: [requiredScope], consentId: userLevelConsent.id 
-            }
-          });
-          return NextResponse.json({
-            error: "consent_required",
-            message: "Specific consent is required for this application to access the requested resource with the necessary permissions. User-level consent found but required scope was missing.",
+            actorType: AuditActorType.APP,
+            actorAppId: authenticatedApp.id,
+            action: "READ_IDENTITY_API_DENIED",
+            targetEntityType: "Identity",
+            targetEntityId: identity.id,
+            outcome: AuditLogOutcome.FAILURE,
             details: {
-              appId: authenticatedApp.id,
-              resourceType: "identity",
-              resourceId: identity.id,
-              requiredScopes: [requiredScope]
-            }
-          }, { status: 403 });
+              appName: authenticatedApp.name,
+              identityLabel: identity.identityLabel,
+              errorReason: "consent_required",
+              specificReason: reason,
+              requiredScopes: [requiredScope],
+              consentId: userLevelConsent.id,
+            },
+          });
+          return NextResponse.json(
+            {
+              error: "consent_required",
+              message:
+                "Specific consent is required for this application to access the requested resource with the necessary permissions. User-level consent found but required scope was missing.",
+              details: {
+                appId: authenticatedApp.id,
+                resourceType: "identity",
+                resourceId: identity.id,
+                requiredScopes: [requiredScope],
+              },
+            },
+            { status: 403 }
+          );
         }
       }
-      
-      const reason = "No valid (identity-specific or user-level) consent with required scope found.";
-      console.warn(`[GET /api/identities/${identityId}] ${reason} for App ${authenticatedApp.id}.`);
+
+      const reason =
+        "No valid (identity-specific or user-level) consent with required scope found.";
+      console.warn(
+        `[GET /api/identities/${identityId}] ${reason} for App ${authenticatedApp.id}.`
+      );
       await createAuditLog({
-        actorType: AuditActorType.APP, actorAppId: authenticatedApp.id, action: "READ_IDENTITY_API_DENIED",
-        targetEntityType: "Identity", targetEntityId: identity.id, outcome: AuditLogOutcome.FAILURE,
-        details: { 
-          appName: authenticatedApp.name, identityLabel: identity.identityLabel, 
-          errorReason: "consent_required", specificReason: reason, requiredScopes: [requiredScope] 
-        }
-      });
-      return NextResponse.json({
-        error: "consent_required",
-        message: "Specific consent is required for this application to access the requested resource with the necessary permissions. No active consent record found granting the required scope.",
+        actorType: AuditActorType.APP,
+        actorAppId: authenticatedApp.id,
+        action: "READ_IDENTITY_API_DENIED",
+        targetEntityType: "Identity",
+        targetEntityId: identity.id,
+        outcome: AuditLogOutcome.FAILURE,
         details: {
-          appId: authenticatedApp.id,
-          resourceType: "identity",
-          resourceId: identity.id,
-          requiredScopes: [requiredScope]
-        }
-      }, { status: 403 });
+          appName: authenticatedApp.name,
+          identityLabel: identity.identityLabel,
+          errorReason: "consent_required",
+          specificReason: reason,
+          requiredScopes: [requiredScope],
+        },
+      });
+      return NextResponse.json(
+        {
+          error: "consent_required",
+          message:
+            "Specific consent is required for this application to access the requested resource with the necessary permissions. No active consent record found granting the required scope.",
+          details: {
+            appId: authenticatedApp.id,
+            resourceType: "identity",
+            resourceId: identity.id,
+            requiredScopes: [requiredScope],
+          },
+        },
+        { status: 403 }
+      );
     }
   }
 
   // Fallback to session-based authentication
-  console.log(`[GET /api/identities/${identityId}] No API key auth attempt or API auth did not resolve. Falling back to session-based auth.`);
+  console.log(
+    `[GET /api/identities/${identityId}] No API key auth attempt or API auth did not resolve. Falling back to session-based auth.`
+  );
   try {
     const identity = await prisma.identity.findUnique({
       where: { id: identityId },
-      include: { 
+      include: {
         linkedExternalAccounts: {
           include: {
             account: true,
-          }
-        } 
+          },
+        },
       },
     });
 
     if (!identity) {
-      console.log(`[GET /api/identities/${identityId}] (Session Auth) Identity not found.`);
-      return NextResponse.json({ error: 'Identity not found' }, { status: 404 });
+      console.log(
+        `[GET /api/identities/${identityId}] (Session Auth) Identity not found.`
+      );
+      return NextResponse.json(
+        { error: "Identity not found" },
+        { status: 404 }
+      );
     }
 
-    console.log(`[GET /api/identities/${identityId}] (Session Auth) Found identity, visibility: ${identity.visibility}`);
+    console.log(
+      `[GET /api/identities/${identityId}] (Session Auth) Found identity, visibility: ${identity.visibility}`
+    );
     const token = await getToken({ req, secret: SECRET });
 
-    if (identity.visibility === 'PUBLIC') {
-      console.log(`[GET /api/identities/${identityId}] (Session Auth) Public identity, returning data.`);
+    if (identity.visibility === "PUBLIC") {
+      console.log(
+        `[GET /api/identities/${identityId}] (Session Auth) Public identity, returning data.`
+      );
       return NextResponse.json(identity);
     }
 
     if (token && token.sub && identity.userId === token.sub) {
-      console.log(`[GET /api/identities/${identityId}] (Session Auth) Private identity, user ${token.sub} is owner. Returning data.`);
+      console.log(
+        `[GET /api/identities/${identityId}] (Session Auth) Private identity, user ${token.sub} is owner. Returning data.`
+      );
       return NextResponse.json(identity);
     }
-    
-    console.warn(`[GET /api/identities/${identityId}] (Session Auth) Forbidden access attempt by user ${token?.sub || 'anonymous'}.`);
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
+    console.warn(
+      `[GET /api/identities/${identityId}] (Session Auth) Forbidden access attempt by user ${
+        token?.sub || "anonymous"
+      }.`
+    );
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   } catch (error) {
-    console.error(`[GET /api/identities/${identityId}] (Session Auth) Error fetching identity:`, error);
-    return NextResponse.json({ error: 'Internal server error during session auth path' }, { status: 500 });
+    console.error(
+      `[GET /api/identities/${identityId}] (Session Auth) Error fetching identity:`,
+      error
+    );
+    return NextResponse.json(
+      { error: "Internal server error during session auth path" },
+      { status: 500 }
+    );
   }
 }
 
@@ -381,15 +508,18 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const identityId = params.id;
+  let token;
   console.log(`[DELETE /api/identities/${identityId}] Received request`);
 
   try {
-    const token = await getToken({ req, secret: SECRET });
+    token = await getToken({ req, secret: SECRET });
     // Ensure token.sub is used for consistency, assuming it holds the user ID.
     // The previous PUT handler used token.id, this uses token.sub like the GET handler.
-    if (!token || !token.sub) { 
-      console.log(`[DELETE /api/identities/${identityId}] Unauthorized: No session token or user ID (sub) in token.`);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!token || !token.sub) {
+      console.log(
+        `[DELETE /api/identities/${identityId}] Unauthorized: No session token or user ID (sub) in token.`
+      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const userId = token.sub;
 
@@ -399,34 +529,58 @@ export async function DELETE(
     });
 
     if (!identity) {
-      console.log(`[DELETE /api/identities/${identityId}] Identity not found for user ${userId}.`);
-      return NextResponse.json({ error: 'Identity not found' }, { status: 404 });
+      console.log(
+        `[DELETE /api/identities/${identityId}] Identity not found for user ${userId}.`
+      );
+      return NextResponse.json(
+        { error: "Identity not found" },
+        { status: 404 }
+      );
     }
 
     if (identity.userId !== userId) {
-      console.warn(`[DELETE /api/identities/${identityId}] Forbidden: User ${userId} does not own identity ${identityId} (owned by ${identity.userId}).`);
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      console.warn(
+        `[DELETE /api/identities/${identityId}] Forbidden: User ${userId} does not own identity ${identityId} (owned by ${identity.userId}).`
+      );
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     await prisma.identity.delete({
       where: { id: identityId },
     });
 
-    console.log(`[DELETE /api/identities/${identityId}] Identity deleted successfully by user ${userId}.`);
+    console.log(
+      `[DELETE /api/identities/${identityId}] Identity deleted successfully by user ${userId}.`
+    );
     // Returning 200 with a message is often preferred over 204 for DELETE if a confirmation is useful
-    return NextResponse.json({ message: 'Identity deleted successfully' }, { status: 200 });
-
+    return NextResponse.json(
+      { message: "Identity deleted successfully" },
+      { status: 200 }
+    );
   } catch (error) {
-    console.error(`[DELETE /api/identities/${identityId}] Error deleting identity for user ${token?.sub || 'unknown'}:`, error);
+    console.error(
+      `[DELETE /api/identities/${identityId}] Error deleting identity for user ${
+        token?.sub || "unknown"
+      }:`,
+      error
+    );
     // Check for specific Prisma errors, e.g., P2025 (Record to delete does not exist)
     // Although findUnique should catch this first.
-    if (error instanceof prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2025') {
-        console.log(`[DELETE /api/identities/${identityId}] Prisma Error P2025: Record to delete does not exist (already deleted?).`);
-        return NextResponse.json({ error: 'Identity not found or already deleted' }, { status: 404 });
+    if (error instanceof PrismaClientKnownRequestError) {
+      if (error.code === "P2025") {
+        console.log(
+          `[DELETE /api/identities/${identityId}] Prisma Error P2025: Record to delete does not exist (already deleted?).`
+        );
+        return NextResponse.json(
+          { error: "Identity not found or already deleted" },
+          { status: 404 }
+        );
       }
       // Add other Prisma error codes to handle if necessary
     }
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
