@@ -2,8 +2,11 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { redirect } from 'next/navigation';
-import MyAppsList from '@/components/apps/MyAppsList'; // This component will be created next
+import MyAppsList from '@/components/apps/MyAppsList';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button'; // Added
+import Link from 'next/link'; // Added
+import { PlusCircle } from 'lucide-react'; // Added
 
 export default async function MyAppsPage() {
   const session = await getServerSession(authOptions);
@@ -21,10 +24,12 @@ export default async function MyAppsPage() {
                 Manage your registered applications and their settings.
             </p>
         </div>
-        {/* Placeholder for future "Register New App" button - to be added in a separate task */}
-        {/* <Button asChild>
-          <Link href="/my-apps/register">Register New App</Link>
-        </Button> */}
+        <Link href="/my-apps/new" passHref legacyBehavior>
+          <Button as="a"> {/* Use 'as="a"' for Next.js Link with Button component */}
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Register New App
+          </Button>
+        </Link>
       </div>
 
       <Card>
