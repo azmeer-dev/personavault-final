@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Info, AlertTriangle, Settings, Copy, Check } from 'lucide-react'; // Icons, Added Copy and Check
+import { Badge } from '@/components/ui/badge';
 
 interface AppData {
   id: string;
@@ -159,7 +160,7 @@ export default function MyAppsList() {
             </CardContent>
           </div>
           <CardFooter className="pt-4 border-t mt-2"> {/* Added border-t and margin-top */}
-            <Link href={`/my-apps/${app.id}/settings`} passHref legacyBehavior className="w-full">
+            <Link href={`/my-apps/${app.id}/settings`} passHref className="w-full">
               <Button variant="outline" className="w-full">
                 <Settings className="mr-2 h-4 w-4" />
                 Manage
