@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import prisma from '@/lib/prisma';
 import { identityFormSchema } from '@/schemas/identityFormSchema';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 const SECRET = process.env.NEXTAUTH_SECRET;
+let token;
 
 export async function PUT(
   req: NextRequest,
@@ -262,7 +264,7 @@ export async function DELETE(
     console.error(`[DELETE /api/identities/${identityId}] Error deleting identity for user ${token?.sub || 'unknown'}:`, error);
     // Check for specific Prisma errors, e.g., P2025 (Record to delete does not exist)
     // Although findUnique should catch this first.
-    if (error instanceof prisma.PrismaClientKnownRequestError) {
+    if (error instanceof PrismaClientKnownRequestError) {
       if (error.code === 'P2025') {
         console.log(`[DELETE /api/identities/${identityId}] Prisma Error P2025: Record to delete does not exist (already deleted?).`);
         return NextResponse.json({ error: 'Identity not found or already deleted' }, { status: 404 });
