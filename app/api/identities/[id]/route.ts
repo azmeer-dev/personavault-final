@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import prisma from '@/lib/prisma';
 import { identityFormSchema } from '@/schemas/identityFormSchema';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 const SECRET = process.env.NEXTAUTH_SECRET;
-let token;
 
 export async function PUT(
   req: NextRequest,
@@ -154,9 +152,16 @@ export async function GET(
           return NextResponse.json(identity);
         } else {
           console.warn(`[GET /api/identities/${identityId}] Identity-specific consent found, but '${requiredScope}' scope missing for App ${authenticatedApp.id}.`);
-          // Fall through to check user-level consent, or deny if strict identity-specific consent is required.
-          // For now, let's be explicit: if identity-specific consent exists but lacks scope, it's a targeted denial.
-           return NextResponse.json({ error: `Forbidden: Insufficient scope in identity-specific consent. '${requiredScope}' is required.` }, { status: 403 });
+          return NextResponse.json({
+            error: "consent_required",
+            message: "Specific consent is required for this application to access the requested resource with the necessary permissions. Identity-specific consent found but required scope was missing.",
+            details: {
+              appId: authenticatedApp.id,
+              resourceType: "identity",
+              resourceId: identity.id,
+              requiredScopes: [requiredScope]
+            }
+          }, { status: 403 });
         }
       } else {
          console.log(`[GET /api/identities/${identityId}] No identity-specific consent found for App ${authenticatedApp.id}. Checking user-level consent.`);
@@ -179,12 +184,30 @@ export async function GET(
           return NextResponse.json(identity);
         } else {
           console.warn(`[GET /api/identities/${identityId}] User-level consent found, but '${requiredScope}' scope missing for App ${authenticatedApp.id}.`);
-          return NextResponse.json({ error: `Forbidden: Insufficient scope in user-level consent. '${requiredScope}' is required.` }, { status: 403 });
+          return NextResponse.json({
+            error: "consent_required",
+            message: "Specific consent is required for this application to access the requested resource with the necessary permissions. User-level consent found but required scope was missing.",
+            details: {
+              appId: authenticatedApp.id,
+              resourceType: "identity",
+              resourceId: identity.id,
+              requiredScopes: [requiredScope]
+            }
+          }, { status: 403 });
         }
       }
       
       console.warn(`[GET /api/identities/${identityId}] No valid (identity-specific or user-level) consent with '${requiredScope}' scope found for App ${authenticatedApp.id}.`);
-      return NextResponse.json({ error: 'Forbidden: Consent not granted or insufficient scope for this application to access the specified identity.' }, { status: 403 });
+      return NextResponse.json({
+        error: "consent_required",
+        message: "Specific consent is required for this application to access the requested resource with the necessary permissions. No active consent record found granting the required scope.",
+        details: {
+          appId: authenticatedApp.id,
+          resourceType: "identity",
+          resourceId: identity.id,
+          requiredScopes: [requiredScope]
+        }
+      }, { status: 403 });
     }
   }
 
@@ -273,7 +296,7 @@ export async function DELETE(
     console.error(`[DELETE /api/identities/${identityId}] Error deleting identity for user ${token?.sub || 'unknown'}:`, error);
     // Check for specific Prisma errors, e.g., P2025 (Record to delete does not exist)
     // Although findUnique should catch this first.
-    if (error instanceof PrismaClientKnownRequestError) {
+    if (error instanceof prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2025') {
         console.log(`[DELETE /api/identities/${identityId}] Prisma Error P2025: Record to delete does not exist (already deleted?).`);
         return NextResponse.json({ error: 'Identity not found or already deleted' }, { status: 404 });
