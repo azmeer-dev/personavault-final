@@ -126,8 +126,17 @@ export async function GET(
         console.log(`[GET /api/identities/${identityId}] Identity not found for App ${authenticatedApp.id}`);
         return NextResponse.json({ error: 'Identity not found' }, { status: 404 });
       }
-      console.log(`[GET /api/identities/${identityId}] Found identity for App ${authenticatedApp.id}, owner: ${identity.userId}`);
+      console.log(`[GET /api/identities/${identityId}] Found identity for App ${authenticatedApp.id}, owner: ${identity.userId}, visibility: ${identity.visibility}`);
 
+      // --- NEW LOGIC: Check for PUBLIC visibility first ---
+      if (identity.visibility === 'PUBLIC') {
+        console.log(`[GET /api/identities/${identityId}] Access to PUBLIC identity ${identity.id} granted to App ${authenticatedApp.id} via API key without specific consent.`);
+        return NextResponse.json(identity);
+      }
+      // --- END NEW LOGIC ---
+
+      // If not public, proceed with consent checks
+      console.log(`[GET /api/identities/${identityId}] Identity ${identity.id} is not public. Proceeding with consent check for App ${authenticatedApp.id}.`);
       // 1. Check for identity-specific consent
       let consent = await prisma.consent.findFirst({
         where: {
