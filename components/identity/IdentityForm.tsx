@@ -690,8 +690,8 @@ export default function IdentityForm({
                         />
                       ) : (
                         <p className="text-sm text-muted-foreground">
-                          Application consents are only available for identities with 'PRIVATE' visibility.
-                          Change visibility to 'PRIVATE' to manage app consents.
+                          Application consents are only available for identities with &apos;PRIVATE&apos; visibility.
+                          Change visibility to &apos;PRIVATE&apos; to manage app consents.
                         </p>
                       )}
                     </AccordionContent>
