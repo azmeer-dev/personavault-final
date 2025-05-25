@@ -37,7 +37,6 @@ export async function GET() {
     // fetch all other users' public identities
     const identities = await prisma.identity.findMany({
       where: {
-        visibility: "PUBLIC",
         ...(userId && { userId: { not: userId } }), // Exclude own identities if logged in
       },
       orderBy: { updatedAt: "desc" },

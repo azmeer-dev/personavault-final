@@ -2,22 +2,41 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ExternalLink, ShieldAlert, Info, CheckCircle2, XCircle, Loader2 } from 'lucide-react'; // Icons
-import { toast } from 'sonner'; // Added for toast notifications
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Added for tabs
+import {
+  ExternalLink,
+  ShieldAlert,
+  Info,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-// Type definitions based on expected API response
 interface AppInfo {
   id: string;
   name: string;
   logoUrl?: string | null;
   description?: string | null;
   websiteUrl?: string | null;
+}
+
+interface UserInfo {
+  id: string;
+  globalDisplayName?: string | null;
+  globalProfileImage?: string | null;
+  legalFullName?: string | null;
 }
 
 interface IdentityInfo {
@@ -29,12 +48,13 @@ interface IdentityInfo {
 
 interface ConsentRequestWithDetails {
   id: string;
-  app: AppInfo;
-  identity?: IdentityInfo | null; // Identity is optional on ConsentRequest
+  app: AppInfo | null;
+  requestingUser: UserInfo | null;
+  identity?: IdentityInfo | null;
   requestedScopes: string[];
   contextDescription?: string | null;
-  createdAt: string; // ISO Date string
-  status: 'PENDING' | 'APPROVED' | 'REJECTED'; // Assuming status is part of the response now
+  createdAt: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
 }
 
 interface ProcessingState {
@@ -42,7 +62,6 @@ interface ProcessingState {
   error: string | null;
 }
 
-// Helper to format dates
 const formatDate = (dateString: string | null | undefined): string => {
   if (!dateString) return 'N/A';
   try {
@@ -53,7 +72,7 @@ const formatDate = (dateString: string | null | undefined): string => {
       hour: '2-digit',
       minute: '2-digit',
     });
-  } catch  {
+  } catch {
     return 'Invalid Date';
   }
 };
@@ -62,148 +81,192 @@ export default function ConsentRequestProcessor() {
   const [requests, setRequests] = useState<ConsentRequestWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [processingStates, setProcessingStates] = useState<{ [key: string]: ProcessingState }>({});
+  const [processingStates, setProcessingStates] = useState<
+    Record<string, ProcessingState>
+  >({});
   const [activeTab, setActiveTab] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
 
-  const fetchRequests = useCallback(async (status: 'PENDING' | 'APPROVED' | 'REJECTED') => {
-    setIsLoading(true);
-    setError(null);
-    setRequests([]); // Clear previous requests when fetching new status
-    try {
-      const response = await fetch(`/api/users/me/consent-requests?status=${status}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to fetch consent requests: ${response.statusText}`);
+  const fetchRequests = useCallback(
+    async (status: 'PENDING' | 'APPROVED' | 'REJECTED') => {
+      setIsLoading(true);
+      setError(null);
+      setRequests([]);
+      try {
+        const response = await fetch(`/api/users/me/consent-requests?status=${status}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Failed to fetch: ${response.statusText}`);
+        }
+        const data: ConsentRequestWithDetails[] = await response.json();
+        setRequests(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setIsLoading(false);
       }
-      const data: ConsentRequestWithDetails[] = await response.json();
-      setRequests(data);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
-      setError(errorMessage);
-      // setRequests([]); // Already cleared at the start of try
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
     fetchRequests(activeTab);
   }, [fetchRequests, activeTab]);
 
-  const processRequest = async (requestId: string, action: 'approve' | 'reject') => {
-    setProcessingStates(prev => ({
+  const processRequest = async (
+    requestId: string,
+    action: 'approve' | 'reject'
+  ) => {
+    setProcessingStates((prev) => ({
       ...prev,
-      [requestId]: { action: action === 'approve' ? 'approving' : 'rejecting', error: null }
+      [requestId]: {
+        action: action === 'approve' ? 'approving' : 'rejecting',
+        error: null,
+      },
     }));
 
     try {
       const response = await fetch(`/api/consent-requests/${requestId}/${action}`, {
         method: 'POST',
       });
-      const responseData = await response.json(); // Try to get response data for error or success
-      if (!response.ok) {
-        throw new Error(responseData.error || `Failed to ${action} request: ${response.statusText}`);
-      }
-      // Success: remove from list and clear processing state for this item
-      setRequests(prevRequests => prevRequests.filter(r => r.id !== requestId));
-      setProcessingStates(prev => {
-        const newState = { ...prev };
-        delete newState[requestId];
-        return newState;
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || response.statusText);
+      setRequests((prev) => prev.filter((r) => r.id !== requestId));
+      setProcessingStates((prev) => {
+        const next = { ...prev };
+        delete next[requestId];
+        return next;
       });
-      toast.success(`Request successfully ${action}ed.`);
+      toast.success(`Request ${action}ed.`);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : `An unknown error occurred during ${action}`;
-      toast.error(errorMessage); // Show error toast
-      setProcessingStates(prev => ({
+      const message =
+        err instanceof Error ? err.message : `Error during ${action}`;
+      toast.error(message);
+      setProcessingStates((prev) => ({
         ...prev,
-        [requestId]: { action: null, error: errorMessage }
+        [requestId]: { action: null, error: message },
       }));
     }
   };
 
-  const renderRequestList = (requestItems: ConsentRequestWithDetails[]) => {
-    if (requestItems.length === 0) {
+  const renderRequestList = (items: ConsentRequestWithDetails[]) => {
+    if (items.length === 0) {
       return (
         <Alert>
           <Info className="h-4 w-4" />
           <AlertTitle>No Requests</AlertTitle>
-          <AlertDescription>There are no {activeTab.toLowerCase()} consent requests at this time.</AlertDescription>
+          <AlertDescription>
+            There are no {activeTab.toLowerCase()} consent requests.
+          </AlertDescription>
         </Alert>
       );
     }
 
     return (
       <div className="space-y-4">
-        {requestItems.map(request => {
-          const currentProcessingState = processingStates[request.id];
-          const isProcessing = currentProcessingState?.action === 'approving' || currentProcessingState?.action === 'rejecting';
+        {items.map((request) => {
+          const state = processingStates[request.id];
+          const working =
+            state?.action === 'approving' || state?.action === 'rejecting';
+
+          const displayName = request.app?.name ?? request.requestingUser?.globalDisplayName ?? request.requestingUser?.legalFullName ??'Unknown';
+          const displayImage = request.app?.logoUrl ?? request.requestingUser?.globalProfileImage ?? undefined;
 
           return (
             <Card key={request.id} className="overflow-hidden">
               <CardHeader className="bg-muted/30 p-4">
-                  <div className="flex items-start justify-between">
-                      <div className="flex items-center space-x-3">
-                          <Avatar className="h-12 w-12 border">
-                          <AvatarImage src={request.app.logoUrl ?? undefined} alt={request.app.name} />
-                          <AvatarFallback>{request.app.name.substring(0, 2).toUpperCase()}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                          <CardTitle className="text-lg">{request.app.name}</CardTitle>
-                          {request.app.websiteUrl && (
-                              <a
-                              href={request.app.websiteUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center"
-                              >
-                              Visit Website <ExternalLink className="ml-1 h-3 w-3" />
-                              </a>
-                          )}
-                          </div>
+                <div className="flex items-start justify-between">
+                  {(request.app || request.requestingUser) && (
+                    <div className="flex items-center space-x-3">
+                      <Avatar className="h-12 w-12 border">
+                        <AvatarImage
+                          src={displayImage}
+                          alt={displayName}
+                        />
+                        <AvatarFallback>
+                          {displayName.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <CardTitle className="text-lg">{displayName}</CardTitle>
+                        {request.app?.websiteUrl && (
+                          <a
+                            href={request.app.websiteUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-muted-foreground hover:text-primary inline-flex items-center"
+                          >
+                            Visit Website <ExternalLink className="ml-1 h-3 w-3" />
+                          </a>
+                        )}
                       </div>
-                       {request.identity && (
-                          <div className="flex items-center space-x-2 text-sm text-muted-foreground border p-2 rounded-md bg-background">
-                              <Avatar className="h-6 w-6">
-                                  <AvatarImage src={request.identity.profilePictureUrl ?? undefined} alt={request.identity.identityLabel} />
-                                  <AvatarFallback>{request.identity.identityLabel.substring(0,1)}</AvatarFallback>
-                              </Avatar>
-                              <span>For: {request.identity.identityLabel} ({request.identity.category})</span>
-                          </div>
-                      )}
-                  </div>
+                    </div>
+                  )}
+                  {request.identity && (
+                    <div className="flex items-center space-x-2 text-sm text-muted-foreground border p-2 rounded-md bg-background">
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage
+                          src={request.identity.profilePictureUrl ?? undefined}
+                          alt={request.identity.identityLabel}
+                        />
+                        <AvatarFallback>
+                          {request.identity.identityLabel[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span>
+                        For: {request.identity.identityLabel} ({request.identity.category})
+                      </span>
+                    </div>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="p-4 space-y-3">
-                {request.app.description && (
-                  <p className="text-sm text-muted-foreground italic">&quot;{request.app.description}&quot;</p>
+                {request.app?.description && (
+                  <p className="text-sm text-muted-foreground italic">
+                    &quot;{request.app.description}&quot;
+                  </p>
                 )}
                 {request.contextDescription && (
-                  <p className="text-sm"><strong className="font-medium">Reason for request:</strong> {request.contextDescription}</p>
+                  <p className="text-sm">
+                    <strong className="font-medium">Reason:</strong> {request.contextDescription}
+                  </p>
                 )}
                 <div>
-                  <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-1">Requested Permissions:</h4>
+                  <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-1">
+                    Requested Permissions:
+                  </h4>
                   <div className="flex flex-wrap gap-1">
-                    {request.requestedScopes.length > 0 ? request.requestedScopes.map(scope => (
-                      <Badge key={scope} variant="secondary">{scope}</Badge>
-                    )) : <Badge variant="outline">No specific scopes requested</Badge>}
+                    {request.requestedScopes.length > 0 ? (
+                      request.requestedScopes.map((scope) => (
+                        <Badge key={scope} variant="secondary">
+                          {scope}
+                        </Badge>
+                      ))
+                    ) : (
+                      <Badge variant="outline">None</Badge>
+                    )}
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Requested on: {formatDate(request.createdAt)}
                 </p>
-                 {activeTab !== 'PENDING' && (
-                    <p className={`text-xs font-semibold ${request.status === 'APPROVED' ? 'text-green-600' : 'text-red-600'}`}>
-                        Status: {request.status}
-                    </p>
-                 )}
+                {activeTab !== 'PENDING' && (
+                  <p
+                    className={`text-xs font-semibold ${
+                      request.status === 'APPROVED'
+                        ? 'text-green-600'
+                        : 'text-red-600'
+                    }`}
+                  >
+                    Status: {request.status}
+                  </p>
+                )}
               </CardContent>
-              {/* Footer with actions only for PENDING requests */}
               {activeTab === 'PENDING' && (
-                <CardFooter className="bg-muted/30 p-4 flex flex-col items-stretch space-y-2">
-                  {currentProcessingState?.error && (
+                <CardFooter className="bg-muted/30 p-4 flex flex-col space-y-2">
+                  {state?.error && (
                     <Alert variant="destructive" className="p-2 text-xs mb-2">
-                        <ShieldAlert className="h-3 w-3 mr-1 inline-block" />
-                        <AlertDescription>{currentProcessingState.error}</AlertDescription>
+                      <ShieldAlert className="h-3 w-3 mr-1 inline-block" />
+                      <AlertDescription>{state.error}</AlertDescription>
                     </Alert>
                   )}
                   <div className="flex flex-col sm:flex-row sm:justify-end sm:space-x-2 space-y-2 sm:space-y-0">
@@ -211,10 +274,10 @@ export default function ConsentRequestProcessor() {
                       variant="outline"
                       size="sm"
                       onClick={() => processRequest(request.id, 'reject')}
-                      disabled={isProcessing}
+                      disabled={working}
                       className="w-full sm:w-auto"
                     >
-                      {currentProcessingState?.action === 'rejecting' ? (
+                      {state?.action === 'rejecting' ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
                         <XCircle className="mr-2 h-4 w-4" />
@@ -224,10 +287,10 @@ export default function ConsentRequestProcessor() {
                     <Button
                       size="sm"
                       onClick={() => processRequest(request.id, 'approve')}
-                      disabled={isProcessing}
+                      disabled={working}
                       className="w-full sm:w-auto"
                     >
-                      {currentProcessingState?.action === 'approving' ? (
+                      {state?.action === 'approving' ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
                         <CheckCircle2 className="mr-2 h-4 w-4" />
@@ -245,26 +308,52 @@ export default function ConsentRequestProcessor() {
   };
 
   return (
-    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="w-full">
+    <Tabs
+      value={activeTab}
+      onValueChange={(value: string) =>
+        setActiveTab(value as 'PENDING' | 'APPROVED' | 'REJECTED')
+      }
+    >
       <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="PENDING">Pending</TabsTrigger>
         <TabsTrigger value="APPROVED">Approved</TabsTrigger>
         <TabsTrigger value="REJECTED">Rejected</TabsTrigger>
       </TabsList>
+
       <TabsContent value="PENDING">
         {isLoading && <Skeleton className="h-20 w-full mt-4" />}
-        {!isLoading && !error && renderRequestList(requests.filter(r => r.status === 'PENDING'))}
-        {error && <Alert variant="destructive"><ShieldAlert className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+        {!isLoading && !error && renderRequestList(requests)}
+        {error && (
+          <Alert variant="destructive">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
       </TabsContent>
+
       <TabsContent value="APPROVED">
         {isLoading && <Skeleton className="h-20 w-full mt-4" />}
-        {!isLoading && !error && renderRequestList(requests.filter(r => r.status === 'APPROVED'))}
-        {error && <Alert variant="destructive"><ShieldAlert className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+        {!isLoading && !error && renderRequestList(requests)}
+        {error && (
+          <Alert variant="destructive">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
       </TabsContent>
+
       <TabsContent value="REJECTED">
         {isLoading && <Skeleton className="h-20 w-full mt-4" />}
-        {!isLoading && !error && renderRequestList(requests.filter(r => r.status === 'REJECTED'))}
-        {error && <Alert variant="destructive"><ShieldAlert className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+        {!isLoading && !error && renderRequestList(requests)}
+        {error && (
+          <Alert variant="destructive">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
       </TabsContent>
     </Tabs>
   );

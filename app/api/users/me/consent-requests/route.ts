@@ -1,53 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import prisma from '@/lib/prisma';
+import { ConsentRequestStatus } from '@prisma/client';
 
 const SECRET = process.env.NEXTAUTH_SECRET;
 
 export async function GET(req: NextRequest) {
   try {
     const token = await getToken({ req, secret: SECRET });
-    if (!token || !token.sub) {
+    if (!token?.sub) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const userId = token.sub;
 
+    const { searchParams } = new URL(req.url);
+    const statusParam = searchParams.get('status');
+
+    const allowedStatuses: ConsentRequestStatus[] = [
+      'PENDING',
+      'APPROVED',
+      'REJECTED',
+    ];
+
+    if (!statusParam || !allowedStatuses.includes(statusParam as ConsentRequestStatus)) {
+      return NextResponse.json({ error: 'Invalid status filter' }, { status: 400 });
+    }
+
+    const status = statusParam as ConsentRequestStatus;
+
     const consentRequests = await prisma.consentRequest.findMany({
       where: {
         targetUserId: userId,
-        status: 'PENDING',
+        status,
       },
       include: {
         app: {
           select: {
-            id: true, // Include app ID for linking or other purposes
+            id: true,
             name: true,
             logoUrl: true,
             description: true,
-            websiteUrl: true, // Added websiteUrl for more context
+            websiteUrl: true,
           },
         },
-        identity: { // This will be null if identityId is not set on the ConsentRequest
+        requestingUser: {
+          select: {
+            id: true,
+            globalDisplayName: true,
+            globalProfileImage: true,
+            legalFullName: true,
+          },
+        },
+        identity: {
           select: {
             id: true,
             identityLabel: true,
             profilePictureUrl: true,
-            category: true, // Added category for more context
+            category: true,
           },
         },
-        // requestedScopes are directly on the ConsentRequest model as a string[]
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
     });
 
-    if (consentRequests.length > 0) {
-      console.log(`[GET /api/users/me/consent-requests] First request keys: ${Object.keys(consentRequests[0]).join(', ')}, App keys: ${Object.keys(consentRequests[0].app).join(', ')}, Identity keys: ${consentRequests[0].identity ? Object.keys(consentRequests[0].identity).join(', ') : 'N/A'}`);
-    }
     return NextResponse.json(consentRequests);
   } catch (error) {
     console.error('Error fetching consent requests:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    );
   }
 }
