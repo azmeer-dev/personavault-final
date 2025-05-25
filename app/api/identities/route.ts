@@ -1,28 +1,65 @@
 import { NextResponse, NextRequest } from "next/server";
+//no space after // always in small letters for comments
 import { getToken } from "next-auth/jwt";
 import prisma from "@/lib/prisma";
-import {
-  Identity,
-  IdentityCategoryType,
-  IdentityVisibility,
-  IdentityContact,
-  AdditionalAttribute,
-  ContextualNameDetails, // Assuming this type is available from Prisma or custom types
-  WebsiteUrl, // Assuming this type is available from Prisma or custom types
-} from "@prisma/client";
-import { PublicIdentity, PrivateIdentityStub } from "@/types/identity";
-import { filterIdentityByScopes } from "@/lib/identityUtils"; // Import the new utility
+import { IdentityCategoryType, IdentityVisibility } from "@prisma/client";
+import { filterIdentityByScopes } from "@/lib/identityUtils";
+import type { PublicIdentity, PrivateIdentityStub } from "@/types/identity";
 
-// Define FullIdentity interface matching the structure used in filterIdentityByScopes
-// This should align with your Prisma model including relations
-interface FullIdentityPrisma extends Identity {
-  contextualNameDetails?: ContextualNameDetails | null;
-  identityContacts: IdentityContact[];
-  websiteUrls: WebsiteUrl[];
-  additionalAttributes: AdditionalAttribute[];
-  // linkedExternalAccounts might also be relevant
+type ContextualNameDetails = { preferredName: string; usageContext: string };
+type IdentityContact = Record<string, string>;
+type OnlinePresence = Record<string, string>;
+type AdditionalAttributes = Record<string, string>;
+
+interface PrismaIdentity {
+  id: string;
+  userId: string;
+  identityLabel: string;
+  category: IdentityCategoryType;
+  customCategoryName: string | null;
+  description: string | null;
+  contextualNameDetails: ContextualNameDetails;
+  identityNameHistory: {
+    name: string;
+    from: string;
+    to: string;
+    context: string;
+  }[];
+  contextualReligiousNames: string[];
+  genderIdentity: string | null;
+  customGenderDescription: string | null;
+  pronouns: string | null;
+  dateOfBirth: Date | null;
+  location: string | null;
+  profilePictureUrl: string | null;
+  identityContacts: IdentityContact;
+  onlinePresence: OnlinePresence;
+  websiteUrls: string[];
+  additionalAttributes: AdditionalAttributes;
+  visibility: IdentityVisibility;
+  createdAt: Date;
+  updatedAt: Date;
+  linkedExternalAccounts: { accountId: string }[];
 }
 
+function safeContextualNameDetails(details: unknown): ContextualNameDetails {
+  if (
+    details &&
+    typeof details === "object" &&
+    "preferredName" in details &&
+    "usageContext" in details &&
+    typeof (details as Record<string, unknown>).preferredName === "string" &&
+    typeof (details as Record<string, unknown>).usageContext === "string"
+  ) {
+    return details as ContextualNameDetails;
+  }
+  return { preferredName: "", usageContext: "" };
+}
+
+function parseJsonField<T>(field: unknown, fallback: T): T {
+  if (!field || typeof field !== "object") return fallback;
+  return field as T;
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -34,62 +71,133 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const targetUserIdParam = searchParams.get("userId");
-    const targetUserId = targetUserIdParam || requesterUserId;
+    const targetUserId = targetUserIdParam ?? requesterUserId;
 
-    // Attempt to get requestingAppId from header (example)
-    const requestingAppId = req.headers.get("X-App-ID") || undefined;
-
+    const requestingAppId = req.headers.get("X-App-ID") ?? undefined;
 
     const identities = await prisma.identity.findMany({
       where: { userId: targetUserId },
-      include: {
-        // Include all relations needed for FullIdentityPrisma and filterIdentityByScopes
-        contextualNameDetails: true,
-        identityContacts: true,
-        websiteUrls: true,
-        additionalAttributes: true,
-        // linkedExternalAccounts: true, // if needed
-      },
-    }) as FullIdentityPrisma[]; // Cast to ensure all fields are available for filterIdentityByScopes
+      include: { linkedExternalAccounts: true },
+    });
+
+    const typedIdentities: PrismaIdentity[] = identities.map((identity) => ({
+      ...identity,
+      category: identity.category as IdentityCategoryType,
+      visibility: identity.visibility as IdentityVisibility,
+      contextualNameDetails: safeContextualNameDetails(
+        identity.contextualNameDetails
+      ),
+      identityNameHistory: parseJsonField<
+        { name: string; from: string; to: string; context: string }[]
+      >(identity.identityNameHistory, []),
+      identityContacts: parseJsonField<IdentityContact>(
+        identity.identityContacts,
+        {}
+      ),
+      onlinePresence: parseJsonField<OnlinePresence>(
+        identity.onlinePresence,
+        {}
+      ),
+      additionalAttributes: parseJsonField<AdditionalAttributes>(
+        identity.additionalAttributes,
+        {}
+      ),
+      genderIdentity: identity.genderIdentity ?? null,
+      customGenderDescription: identity.customGenderDescription ?? null,
+      pronouns: identity.pronouns ?? null,
+      location: identity.location ?? null,
+      profilePictureUrl: identity.profilePictureUrl ?? null,
+      websiteUrls: identity.websiteUrls ?? [],
+    }));
 
     if (requesterUserId === targetUserId) {
-      // User viewing their own identities, return full objects
-      return NextResponse.json(identities);
+      //user viewing their own identities, return all
+      const result: PublicIdentity[] = typedIdentities.map((identity) => ({
+        id: identity.id,
+        identityLabel: identity.identityLabel,
+        profilePictureUrl: identity.profilePictureUrl,
+        description: identity.description,
+        category: identity.category,
+        customCategoryName: identity.customCategoryName,
+        genderIdentity: identity.genderIdentity,
+        pronouns: identity.pronouns,
+        location: identity.location,
+        dateOfBirth: identity.dateOfBirth,
+        visibility: identity.visibility,
+        contextualNameDetails: identity.contextualNameDetails,
+        websiteUrls: identity.websiteUrls,
+        linkedAccountIds: identity.linkedExternalAccounts.map(
+          (a) => a.accountId
+        ),
+      }));
+      return NextResponse.json(result);
     } else {
-      // User viewing another's identities, fetch consents for this target user
+      const now = new Date();
       const consents = await prisma.consent.findMany({
         where: {
-          userId: targetUserId, // Consents granted by the target user
+          userId: targetUserId,
           revokedAt: null,
-          // Add expiresAt logic if applicable:
-          // OR: [ { expiresAt: null }, { expiresAt: { gt: new Date() } } ],
-          status: "ACTIVE", // Assuming 'ACTIVE' means approved and not expired/revoked
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
         },
       });
-      
-      // Create a lookup for consents by identityId and appId
-      const consentLookup = new Map<string, Map<string, typeof consents[0]>>();
+
+      const consentLookup = new Map<
+        string,
+        Map<string, (typeof consents)[0]>
+      >();
       for (const consent of consents) {
-        if (!consent.appId) continue; // Skip consents not tied to an app if requestingAppId logic is strict
+        if (!consent.appId || !consent.identityId) continue;
         if (!consentLookup.has(consent.identityId)) {
           consentLookup.set(consent.identityId, new Map());
         }
         consentLookup.get(consent.identityId)!.set(consent.appId, consent);
       }
 
-      const transformedIdentities = identities
-        .map((identity): PublicIdentity | PrivateIdentityStub | Partial<FullIdentityPrisma> | null => {
+      const transformedIdentities = typedIdentities
+        .map((identity): PublicIdentity | PrivateIdentityStub | null => {
           let relevantConsent = null;
           if (requestingAppId && identity.id) {
-            relevantConsent = consentLookup.get(identity.id)?.get(requestingAppId);
+            relevantConsent = consentLookup
+              .get(identity.id)
+              ?.get(requestingAppId);
           }
-          
-          if (relevantConsent && (identity.visibility === IdentityVisibility.PRIVATE || identity.visibility === IdentityVisibility.APP_SPECIFIC)) {
-            // Valid consent found for this app, filter and return
-            // The filterIdentityByScopes function expects a FullIdentity, ensure `identity` matches
-            return filterIdentityByScopes(identity, relevantConsent.grantedScopes);
+
+          if (
+            relevantConsent &&
+            (identity.visibility === IdentityVisibility.PRIVATE ||
+              identity.visibility === IdentityVisibility.APP_SPECIFIC)
+          ) {
+            //this returns a Partial, so fill all missing required fields for PublicIdentity
+            //do not include linkedExternalAccounts in the object you pass in
+            const { ...fullIdentity } = identity;
+            const partial = filterIdentityByScopes(
+              fullIdentity,
+              relevantConsent.grantedScopes
+            ) as Partial<PublicIdentity>;
+
+            return {
+              id: partial.id ?? identity.id,
+              identityLabel: partial.identityLabel ?? "",
+              profilePictureUrl: partial.profilePictureUrl ?? null,
+              description: partial.description ?? null,
+              category: partial.category ?? identity.category,
+              customCategoryName:
+                partial.customCategoryName ?? identity.customCategoryName,
+              genderIdentity: partial.genderIdentity ?? null,
+              pronouns: partial.pronouns ?? null,
+              location: partial.location ?? null,
+              dateOfBirth: partial.dateOfBirth ?? null,
+              visibility: partial.visibility ?? identity.visibility,
+              contextualNameDetails: partial.contextualNameDetails ?? {
+                preferredName: "",
+                usageContext: "",
+              },
+              websiteUrls: partial.websiteUrls ?? [],
+              linkedAccountIds:
+                partial.linkedAccountIds ??
+                identity.linkedExternalAccounts.map((a) => a.accountId),
+            };
           } else {
-            // No specific consent for this app, or identity is public
             switch (identity.visibility) {
               case IdentityVisibility.PUBLIC:
               case IdentityVisibility.AUTHENTICATED_USERS:
@@ -105,30 +213,33 @@ export async function GET(req: NextRequest) {
                   location: identity.location,
                   dateOfBirth: identity.dateOfBirth,
                   visibility: identity.visibility,
-                  contextualNameDetails: identity.contextualNameDetails ? {
-                    preferredName: identity.contextualNameDetails.preferredName || "",
-                    usageContext: identity.contextualNameDetails.usageContext || "",
-                  } : { preferredName: "", usageContext: "" },
-                  websiteUrls: identity.websiteUrls.map((wu) => wu.url),
-                  linkedAccountIds: undefined, // Or implement fetching if needed
+                  contextualNameDetails: identity.contextualNameDetails,
+                  websiteUrls: identity.websiteUrls,
+                  linkedAccountIds: identity.linkedExternalAccounts.map(
+                    (a) => a.accountId
+                  ),
                 };
               case IdentityVisibility.PRIVATE:
                 return {
                   id: identity.id,
-                  visibility: IdentityVisibility.PRIVATE,
+                  visibility: "PRIVATE",
                   category: identity.category,
-                  customCategoryName: identity.category === IdentityCategoryType.CUSTOM ? identity.customCategoryName : null,
+                  customCategoryName:
+                    identity.category === IdentityCategoryType.CUSTOM
+                      ? identity.customCategoryName
+                      : null,
                   identityLabel: "Private Identity",
                   profilePictureUrl: "/img/private-icon.svg",
                 };
               case IdentityVisibility.APP_SPECIFIC:
-                 // For APP_SPECIFIC, if no consent for *this specific app*, return stub.
-                 // If there was consent, it would have been handled by filterIdentityByScopes.
                 return {
                   id: identity.id,
-                  visibility: IdentityVisibility.APP_SPECIFIC,
+                  visibility: "APP_SPECIFIC",
                   category: identity.category,
-                  customCategoryName: identity.category === IdentityCategoryType.CUSTOM ? identity.customCategoryName : null,
+                  customCategoryName:
+                    identity.category === IdentityCategoryType.CUSTOM
+                      ? identity.customCategoryName
+                      : null,
                   identityLabel: "Restricted Identity",
                   profilePictureUrl: "/img/restricted-icon.svg",
                 };
@@ -137,14 +248,18 @@ export async function GET(req: NextRequest) {
             }
           }
         })
-        .filter(Boolean); // Filter out any nulls
+        .filter(Boolean);
 
       return NextResponse.json(transformedIdentities);
     }
   } catch (error) {
-    console.error("Error fetching identities:", error);
-    // It's good practice to avoid sending detailed error messages to the client in production
-    const errorMessage = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ error: "Internal server error", details: errorMessage }, { status: 500 });
+    //do not leak details to the client
+    console.error("error fetching identities:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "internal server error";
+    return NextResponse.json(
+      { error: "internal server error", details: errorMessage },
+      { status: 500 }
+    );
   }
 }

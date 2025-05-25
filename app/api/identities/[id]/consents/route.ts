@@ -43,14 +43,15 @@ export async function GET(
   });
 
   const grantedMap = new Map<string, unknown>();
-  activeConsents.forEach((c) =>
+  activeConsents.forEach((c) => {
+    if (!c.appId) return; // skip invalid entries
     grantedMap.set(c.appId, {
       ...c.app,
       consentId: c.id,
       grantedScopes: c.grantedScopes,
       grantedAt: c.grantedAt,
-    })
-  );
+    });
+  });
 
   return NextResponse.json({
     grantedApps: Array.from(grantedMap.values()),
