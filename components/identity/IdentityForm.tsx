@@ -48,6 +48,7 @@ import {
 } from '@/components/ui/radio-group';
 import Image from 'next/image';
 import { toast } from 'sonner';
+import IdentityAppConsentsManager from '@/components/identity/IdentityAppConsentsManager'; // Added import
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
@@ -318,6 +319,8 @@ export default function IdentityForm({
     control,
     formState: { isSubmitting },
   } = form;
+
+  const currentVisibility = watch('visibility', initialValues?.visibility);
 
   /* linked accounts */
   const linkedIds = watch('linkedAccountIds') ?? [];
@@ -673,6 +676,27 @@ export default function IdentityForm({
                     </div>
                   </AccordionContent>
                 </AccordionItem>
+
+                {/* APPLICATION CONSENTS - Conditionally render if identityId exists */}
+                {identityId && (
+                  <AccordionItem value="consents">
+                    <AccordionTrigger>Application Consents</AccordionTrigger>
+                    <AccordionContent className="space-y-4">
+                      {currentVisibility === 'PRIVATE' ? (
+                        <IdentityAppConsentsManager
+                          identityId={identityId}
+                          userId={userId}
+                          identityVisibility={currentVisibility}
+                        />
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Application consents are only available for identities with 'PRIVATE' visibility.
+                          Change visibility to 'PRIVATE' to manage app consents.
+                        </p>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                )}
               </Accordion>
 
               <Button className="w-full" type="submit" disabled={isSubmitting}>
