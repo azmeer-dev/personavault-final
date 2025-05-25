@@ -50,6 +50,7 @@ export default async function IdentitiesPage() {
         : undefined,
       websiteUrls: row.websiteUrls ?? [],
       linkedAccountIds: row.linkedExternalAccounts.map((l) => l.accountId),
+      visibility: row.visibility,
     };
 
     return { data, accounts };
