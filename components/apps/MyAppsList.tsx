@@ -160,7 +160,7 @@ export default function MyAppsList() {
             </CardContent>
           </div>
           <CardFooter className="pt-4 border-t mt-2"> {/* Added border-t and margin-top */}
-            <Link href={`/my-apps/${app.id}/settings`} passHref legacyBehavior className="w-full">
+            <Link href={`/my-apps/${app.id}/settings`} passHref className="w-full">
               <Button variant="outline" className="w-full">
                 <Settings className="mr-2 h-4 w-4" />
                 Manage

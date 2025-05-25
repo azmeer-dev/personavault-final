@@ -24,6 +24,7 @@ type Slice = {
   dateOfBirth?: Date | string | null;
   websiteUrls: string[];
   linkedAccountIds?: string[];
+  visibility?: string;
 };
 
 interface AccountOption {
@@ -57,7 +58,7 @@ export default function IdentityLiveCard({
   const usageCtx = data.contextualNameDetails?.usageContext?.trim();
   const site = data.websiteUrls?.[0];
   const linked = accounts.filter((a) => data.linkedAccountIds?.includes(a.id));
-
+  const visibility = data.visibility;
   /* styles */
   const cardClass = `flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 p-4 sm:p-6 rounded-2xl shadow-sm border bg-background w-full ${
     classProp ?? ""
@@ -154,6 +155,14 @@ export default function IdentityLiveCard({
                     {capitalize(a.provider)}
                   </span>
                 ))}
+              </span>
+            </>
+          )}
+          {visibility && (
+            <>
+              <span className={infoLabel}>Visibility</span>
+              <span className="inline-flex items-center rounded bg-muted px-2 py-0.5 text-xs mr-auto">
+                {capitalize(visibility)}
               </span>
             </>
           )}

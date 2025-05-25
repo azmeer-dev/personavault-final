@@ -24,7 +24,7 @@ export default async function MyAppsPage() {
                 Manage your registered applications and their settings.
             </p>
         </div>
-        <Link href="/my-apps/new" passHref legacyBehavior>
+        <Link href="/my-apps/new" passHref>
           <Button> {/* Use 'as="a"' for Next.js Link with Button component */}
             <PlusCircle className="mr-2 h-4 w-4" />
             Register New App
