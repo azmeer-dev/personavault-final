@@ -21,10 +21,12 @@ model User {
   updatedAt              DateTime         @updatedAt
   twoFactorSecret        String?
   twoFactorEnabled       Boolean          @default(false)
+
   accounts               Account[]
   ownedApps              App[]
   auditLogEntries        AuditLog[]       @relation("UserAuditLogEntries")
-  consentsGiven          Consent[]        @relation("UserConsents")
+  consentsGiven          Consent[]        @relation("UserConsents")             // App-to-user consents
+  consentsReceived       Consent[]        @relation("UserConsentsReceived")    // User-to-user consents
   consentRequestsByUser  ConsentRequest[] @relation("RequestingUserConsentRequests")
   consentRequestsForUser ConsentRequest[] @relation("TargetUserConsentRequests")
   identities             Identity[]
@@ -150,28 +152,37 @@ model App {
 }
 
 model Consent {
-  id            String    @id @default(cuid())
-  userId        String
-  appId         String
-  identityId    String?
-  grantedScopes String[]
-  grantedAt     DateTime  @default(now())
-  expiresAt     DateTime?
-  lastUsedAt    DateTime?
-  revokedAt     DateTime?
-  app           App       @relation("AppConsents", fields: [appId], references: [id], onDelete: Cascade)
-  identity      Identity? @relation("IdentityConsents", fields: [identityId], references: [id], onDelete: Cascade)
-  user          User      @relation("UserConsents", fields: [userId], references: [id], onDelete: Cascade)
+  id                String    @id @default(cuid())
+  userId            String    // the resource owner (whose identity was shared)
+  appId             String?   // the consuming App, if any
+  requestingUserId  String?   // the consuming User, if any
+  identityId        String?
+  grantedScopes     String[]
+  grantedAt         DateTime  @default(now())
+  lastUsedAt        DateTime?
+  expiresAt         DateTime?
+  revokedAt         DateTime?
 
-  @@unique([userId, appId, identityId], name: "UserAppIdentityConsent")
+  // relations
+  app           App?      @relation("AppConsents",        fields: [appId],            references: [id], onDelete: Cascade)
+  requestingUser User?    @relation("UserConsents",       fields: [requestingUserId], references: [id], onDelete: Cascade)
+  user          User      @relation("UserConsentsReceived", fields: [userId],        references: [id], onDelete: Cascade)
+  identity      Identity? @relation("IdentityConsents",    fields: [identityId],     references: [id], onDelete: Cascade)
+
+  // unique constraints to prevent duplicate grants
+  @@unique([userId, appId,            identityId], name: "UserAppIdentityConsent")
+  @@unique([userId, requestingUserId, identityId], name: "UserUserIdentityConsent")
+
   @@index([userId, appId])
+  @@index([userId, requestingUserId])
   @@index([identityId])
 }
+
 
 model ConsentRequest {
   id                         String               @id @default(cuid())
   targetUserId               String
-  appId                      String
+  appId                      String?
   requestingUserId           String?
   identityId                 String?
   contextDescription         String
@@ -182,7 +193,7 @@ model ConsentRequest {
   expiresAt                  DateTime?
   createdAt                  DateTime             @default(now())
   updatedAt                  DateTime             @updatedAt
-  app                        App                  @relation("AppConsentRequests", fields: [appId], references: [id], onDelete: Cascade)
+  app                        App?                  @relation("AppConsentRequests", fields: [appId], references: [id], onDelete: Cascade)
   identity                   Identity?            @relation("IdentityConsentRequests", fields: [identityId], references: [id], onDelete: Cascade)
   requestingUser             User?                @relation("RequestingUserConsentRequests", fields: [requestingUserId], references: [id])
   targetUser                 User                 @relation("TargetUserConsentRequests", fields: [targetUserId], references: [id], onDelete: Cascade)

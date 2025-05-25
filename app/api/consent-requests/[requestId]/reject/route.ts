@@ -107,7 +107,7 @@ export async function POST(
         appId: updatedRequest.appId,
         identityId: updatedRequest.identityId,
         scopes: updatedRequest.requestedScopes,
-        appName: consentRequest.app.name,
+        appName: consentRequest.app?.name,
       },
     });
 
