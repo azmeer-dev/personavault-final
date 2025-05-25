@@ -1,130 +1,150 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import prisma from "@/lib/prisma";
+import {
+  Identity,
+  IdentityCategoryType,
+  IdentityVisibility,
+  IdentityContact,
+  AdditionalAttribute,
+  ContextualNameDetails, // Assuming this type is available from Prisma or custom types
+  WebsiteUrl, // Assuming this type is available from Prisma or custom types
+} from "@prisma/client";
+import { PublicIdentity, PrivateIdentityStub } from "@/types/identity";
+import { filterIdentityByScopes } from "@/lib/identityUtils"; // Import the new utility
 
-const SECRET = process.env.NEXTAUTH_SECRET;
-
-async function getSessionUserId(req: NextRequest): Promise<string | null> {
-  const token = await getToken({ req, secret: SECRET });
-  return token?.sub || null;
+// Define FullIdentity interface matching the structure used in filterIdentityByScopes
+// This should align with your Prisma model including relations
+interface FullIdentityPrisma extends Identity {
+  contextualNameDetails?: ContextualNameDetails | null;
+  identityContacts: IdentityContact[];
+  websiteUrls: WebsiteUrl[];
+  additionalAttributes: AdditionalAttribute[];
+  // linkedExternalAccounts might also be relevant
 }
 
-export async function POST(req: NextRequest) {
+
+export async function GET(req: NextRequest) {
   try {
-    const userId = await getSessionUserId(req);
-    if (!userId) {
+    const token = await getToken({ req });
+    if (!token || !token.sub) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const requesterUserId = token.sub;
 
-    const data = await req.json();
+    const { searchParams } = new URL(req.url);
+    const targetUserIdParam = searchParams.get("userId");
+    const targetUserId = targetUserIdParam || requesterUserId;
 
-    if (!data.identityLabel) {
-      return NextResponse.json(
-        { error: "Missing Identity Label" },
-        { status: 400 }
-      );
-    }
+    // Attempt to get requestingAppId from header (example)
+    const requestingAppId = req.headers.get("X-App-ID") || undefined;
 
-    const created = await prisma.identity.create({
-      data: {
-        userId,
-        identityLabel: data.identityLabel,
-        category: data.category,
-        customCategoryName: data.customCategoryName,
-        description: data.description,
-        contextualNameDetails: data.contextualNameDetails,
-        identityNameHistory: data.identityNameHistory,
-        contextualReligiousNames: data.contextualReligiousNames,
-        genderIdentity: data.genderIdentity,
-        customGenderDescription: data.customGenderDescription,
-        pronouns: data.pronouns,
-        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
-        location: data.location,
-        profilePictureUrl: data.profilePictureUrl,
-        identityContacts: data.identityContacts,
-        onlinePresence: data.onlinePresence,
-        websiteUrls: data.websiteUrls,
-        additionalAttributes: data.additionalAttributes,
-        visibility: data.visibility,
-        linkedExternalAccounts: {
-          create: (data.linkedAccountIds || []).map((accountId: string) => ({
-            account: { connect: { id: accountId } },
-          })),
-        },
+
+    const identities = await prisma.identity.findMany({
+      where: { userId: targetUserId },
+      include: {
+        // Include all relations needed for FullIdentityPrisma and filterIdentityByScopes
+        contextualNameDetails: true,
+        identityContacts: true,
+        websiteUrls: true,
+        additionalAttributes: true,
+        // linkedExternalAccounts: true, // if needed
       },
-    });
+    }) as FullIdentityPrisma[]; // Cast to ensure all fields are available for filterIdentityByScopes
 
-    return NextResponse.json(created);
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function PUT(req: NextRequest) {
-  try {
-    const userId = await getSessionUserId(req);
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const data = await req.json();
-
-    if (!data.identityLabel) {
-      return NextResponse.json(
-        { error: "Missing Identity Label" },
-        { status: 400 }
-      );
-    }
-
-    const existing = await prisma.identity.findFirst({
-      where: { userId, identityLabel: data.identityLabel },
-      select: { id: true },
-    });
-
-    if (!existing) {
-      return NextResponse.json(
-        { error: "Identity not found or not owned by user" },
-        { status: 404 }
-      );
-    }
-
-    const updated = await prisma.identity.update({
-      where: { id: existing.id },
-      data: {
-        category: data.category,
-        customCategoryName: data.customCategoryName,
-        description: data.description,
-        contextualNameDetails: data.contextualNameDetails,
-        identityNameHistory: data.identityNameHistory,
-        contextualReligiousNames: data.contextualReligiousNames,
-        genderIdentity: data.genderIdentity,
-        customGenderDescription: data.customGenderDescription,
-        pronouns: data.pronouns,
-        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
-        location: data.location,
-        profilePictureUrl: data.profilePictureUrl,
-        identityContacts: data.identityContacts,
-        onlinePresence: data.onlinePresence,
-        websiteUrls: data.websiteUrls,
-        additionalAttributes: data.additionalAttributes,
-        visibility: data.visibility,
-        linkedExternalAccounts: {
-          deleteMany: {},
-          create: (data.linkedAccountIds || []).map((accountId: string) => ({
-            account: { connect: { id: accountId } },
-          })),
+    if (requesterUserId === targetUserId) {
+      // User viewing their own identities, return full objects
+      return NextResponse.json(identities);
+    } else {
+      // User viewing another's identities, fetch consents for this target user
+      const consents = await prisma.consent.findMany({
+        where: {
+          userId: targetUserId, // Consents granted by the target user
+          revokedAt: null,
+          // Add expiresAt logic if applicable:
+          // OR: [ { expiresAt: null }, { expiresAt: { gt: new Date() } } ],
+          status: "ACTIVE", // Assuming 'ACTIVE' means approved and not expired/revoked
         },
-      },
-    });
+      });
+      
+      // Create a lookup for consents by identityId and appId
+      const consentLookup = new Map<string, Map<string, typeof consents[0]>>();
+      for (const consent of consents) {
+        if (!consent.appId) continue; // Skip consents not tied to an app if requestingAppId logic is strict
+        if (!consentLookup.has(consent.identityId)) {
+          consentLookup.set(consent.identityId, new Map());
+        }
+        consentLookup.get(consent.identityId)!.set(consent.appId, consent);
+      }
 
-    return NextResponse.json(updated);
+      const transformedIdentities = identities
+        .map((identity): PublicIdentity | PrivateIdentityStub | Partial<FullIdentityPrisma> | null => {
+          let relevantConsent = null;
+          if (requestingAppId && identity.id) {
+            relevantConsent = consentLookup.get(identity.id)?.get(requestingAppId);
+          }
+          
+          if (relevantConsent && (identity.visibility === IdentityVisibility.PRIVATE || identity.visibility === IdentityVisibility.APP_SPECIFIC)) {
+            // Valid consent found for this app, filter and return
+            // The filterIdentityByScopes function expects a FullIdentity, ensure `identity` matches
+            return filterIdentityByScopes(identity, relevantConsent.grantedScopes);
+          } else {
+            // No specific consent for this app, or identity is public
+            switch (identity.visibility) {
+              case IdentityVisibility.PUBLIC:
+              case IdentityVisibility.AUTHENTICATED_USERS:
+                return {
+                  id: identity.id,
+                  identityLabel: identity.identityLabel,
+                  profilePictureUrl: identity.profilePictureUrl,
+                  description: identity.description,
+                  category: identity.category,
+                  customCategoryName: identity.customCategoryName,
+                  genderIdentity: identity.genderIdentity,
+                  pronouns: identity.pronouns,
+                  location: identity.location,
+                  dateOfBirth: identity.dateOfBirth,
+                  visibility: identity.visibility,
+                  contextualNameDetails: identity.contextualNameDetails ? {
+                    preferredName: identity.contextualNameDetails.preferredName || "",
+                    usageContext: identity.contextualNameDetails.usageContext || "",
+                  } : { preferredName: "", usageContext: "" },
+                  websiteUrls: identity.websiteUrls.map((wu) => wu.url),
+                  linkedAccountIds: undefined, // Or implement fetching if needed
+                };
+              case IdentityVisibility.PRIVATE:
+                return {
+                  id: identity.id,
+                  visibility: IdentityVisibility.PRIVATE,
+                  category: identity.category,
+                  customCategoryName: identity.category === IdentityCategoryType.CUSTOM ? identity.customCategoryName : null,
+                  identityLabel: "Private Identity",
+                  profilePictureUrl: "/img/private-icon.svg",
+                };
+              case IdentityVisibility.APP_SPECIFIC:
+                 // For APP_SPECIFIC, if no consent for *this specific app*, return stub.
+                 // If there was consent, it would have been handled by filterIdentityByScopes.
+                return {
+                  id: identity.id,
+                  visibility: IdentityVisibility.APP_SPECIFIC,
+                  category: identity.category,
+                  customCategoryName: identity.category === IdentityCategoryType.CUSTOM ? identity.customCategoryName : null,
+                  identityLabel: "Restricted Identity",
+                  profilePictureUrl: "/img/restricted-icon.svg",
+                };
+              default:
+                return null;
+            }
+          }
+        })
+        .filter(Boolean); // Filter out any nulls
+
+      return NextResponse.json(transformedIdentities);
+    }
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
-    );
+    console.error("Error fetching identities:", error);
+    // It's good practice to avoid sending detailed error messages to the client in production
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    return NextResponse.json({ error: "Internal server error", details: errorMessage }, { status: 500 });
   }
 }
