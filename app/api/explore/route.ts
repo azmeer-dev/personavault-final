@@ -4,43 +4,61 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import prisma from "@/lib/prisma";
-import { type IdentityLiveCardProps } from "@/components/identity/IdentityLiveCard"; // Import the type
+import { type IdentityLiveCardProps } from "@/components/identity/IdentityLiveCard";
 
-// fallback for contextualNameDetails (moved from page.tsx)
+// fallback for contextualNameDetails
 const defaultContextual = { preferredName: "", usageContext: "" };
 
-// type guard for contextualNameDetails (moved from page.tsx)
-function isContextual(
-  val: unknown
-): val is { preferredName: string; usageContext: string } {
+// type guard
+function isContextual(val: unknown): val is { preferredName: string; usageContext: string } {
   return (
     typeof val === "object" &&
     val !== null &&
     "preferredName" in val &&
     "usageContext" in val &&
-    typeof val.preferredName === "string" && // Added type assertion for safety
-    typeof val.usageContext === "string" // Added type assertion for safety
+    typeof (val).preferredName === "string" &&
+    typeof (val).usageContext === "string"
   );
 }
 
 export async function GET() {
-
-   const session = await getServerSession(authOptions);
+  const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
-  console.log(userId)
 
   try {
-
-    // fetch all other users' public identities
     const identities = await prisma.identity.findMany({
       where: {
-        ...(userId && { userId: { not: userId } }), // Exclude own identities if logged in
+        userId: { not: userId },
+        OR: [
+          { visibility: "PUBLIC" },
+          {
+            relatedConsents: {
+              some: {
+                requestingUserId: userId,
+                revokedAt: null,
+                grantedScopes: { has: "identity.read" },
+              },
+            },
+          },
+          {
+            user: {
+              consentsGiven: {
+                some: {
+                  requestingUserId: userId,
+                  identityId: null,
+                  revokedAt: null,
+                  grantedScopes: { has: "identity.read" },
+                },
+              },
+            },
+          },
+        ],
       },
       orderBy: { updatedAt: "desc" },
-      select: { // Explicitly select fields to avoid fetching userId
+      select: {
         id: true,
         identityLabel: true,
         profilePictureUrl: true,
@@ -53,9 +71,8 @@ export async function GET() {
         location: true,
         dateOfBirth: true,
         websiteUrls: true,
-        visibility: true, // Still needed for the where clause, though not directly mapped
-        updatedAt: true, // Still needed for orderBy, though not directly mapped
-        // userId is now EXCLUDED from fetching
+        visibility: true,
+        updatedAt: true,
         linkedExternalAccounts: {
           select: {
             accountId: true,
@@ -65,16 +82,14 @@ export async function GET() {
       },
     });
 
-    // map each row into the props your LiveCard expects
     const cards: IdentityLiveCardProps[] = identities.map((row) => {
-      // narrow or fallback contextualNameDetails
       const contextualDetails = isContextual(row.contextualNameDetails)
         ? row.contextualNameDetails
         : defaultContextual;
 
       const data: IdentityLiveCardProps["data"] = {
-        identityLabel: row.identityLabel,
         identityId: row.id,
+        identityLabel: row.identityLabel,
         profilePictureUrl: row.profilePictureUrl ?? null,
         description: row.description ?? null,
         category: row.category,
@@ -85,29 +100,21 @@ export async function GET() {
         location: row.location ?? null,
         dateOfBirth: row.dateOfBirth ?? null,
         websiteUrls: row.websiteUrls ?? [],
-        linkedAccountIds: row.linkedExternalAccounts.map(
-          (l: { accountId: string }) => l.accountId
-        ),
+        linkedAccountIds: row.linkedExternalAccounts.map((l) => l.accountId),
       };
 
-      const accounts: IdentityLiveCardProps["accounts"] =
-        row.linkedExternalAccounts.map(
-          (l: { accountId: string; account: { provider: string } }) => ({
-            id: l.accountId,
-            provider: l.account.provider,
-            emailFromProvider: null, // This field is not selected, so it's null
-          })
-        );
+      const accounts: IdentityLiveCardProps["accounts"] = row.linkedExternalAccounts.map((l) => ({
+        id: l.accountId,
+        provider: l.account.provider,
+        emailFromProvider: null,
+      }));
 
       return { data, accounts };
     });
 
     return NextResponse.json(cards);
   } catch (error) {
-    console.error("Failed to fetch public identities:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch public identities" },
-      { status: 500 }
-    );
+    console.error("Failed to fetch identities:", error);
+    return NextResponse.json({ error: "Failed to fetch identities" }, { status: 500 });
   }
 }

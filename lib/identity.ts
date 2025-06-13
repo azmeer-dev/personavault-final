@@ -16,16 +16,36 @@ export async function logAuditEntry(data: LogAuditEntryData) {
   return prisma.auditLog.create({ data });
 }
 
-export async function getIdentityById(id: string) {
-  return prisma.identity.findUnique({
-    where: { id, visibility: "PUBLIC" },
+// lib/identity.ts
+export async function getIdentityById(id: string, viewerId?: string | null) {
+  const identity = await prisma.identity.findUnique({
+    where: { id },
     include: {
       linkedExternalAccounts: {
-        select: {
-          accountId: true,
-          account: { select: { emailFromProvider: true, provider: true } },
+        include: {
+          account: true,
         },
       },
     },
   });
+
+  if (!identity) return null;
+
+  if (identity.visibility === "PUBLIC") return identity;
+
+  if (!viewerId) return null;
+
+  const accessGranted = await prisma.consent.findFirst({
+    where: {
+      requestingUserId: viewerId,
+      revokedAt: null,
+      OR: [
+        { identityId: id },
+        { identityId: null, userId: identity.userId },
+      ],
+    },
+  });
+
+  return accessGranted ? identity : null;
 }
+

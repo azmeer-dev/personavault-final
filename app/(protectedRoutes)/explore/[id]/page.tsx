@@ -1,53 +1,50 @@
-// page.tsx
-import { getIdentityById } from "@/lib/identity"; // logAuditEntry removed
-import { createAuditLog } from "@/lib/audit"; // createAuditLog added
-import FullIdentityProfile from "@/components/identity/FullIdentityView";
+// app/(protectedRoutes)/explore/[id]/page.tsx
+
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { notFound } from "next/navigation";
+
+import { getIdentityById } from "@/lib/identity";
+import { createAuditLog } from "@/lib/audit";
 import { AuditActorType, AuditLogOutcome } from "@prisma/client";
-//export const dynamic = "force-dynamic";
+
+import FullIdentityProfile from "@/components/identity/FullIdentityView";
 
 export default async function IdentityPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const resolvedParams = await params;
-  const identity = await getIdentityById(resolvedParams.id);
-
-  // --- MODIFICATION START ---
-  if (identity && identity.visibility !== 'PUBLIC') {
-    // Consider if a specific "forbidden" page is better, but notFound is fine for now
-    // as this URL path implies public exploration.
-    return notFound(); 
-  }
-  // --- MODIFICATION END ---
-
-  if (!identity) return notFound(); // This existing check is still good
+  const { id } = await params;
 
   const session = await getServerSession(authOptions);
-  const viewerId = session?.user?.id ?? "anonymous";
-  const viewerType = session ? AuditActorType.USER : AuditActorType.SYSTEM;
+  const viewerId = session?.user?.id ?? null;
+  const viewerType = viewerId ? AuditActorType.USER : AuditActorType.SYSTEM;
 
-  await createAuditLog({ // Changed to createAuditLog
+  const identity = await getIdentityById(id, viewerId);
+
+  if (!identity) return notFound();
+
+  await createAuditLog({
     actorType: viewerType,
-    actorUserId: viewerType === AuditActorType.USER ? viewerId : undefined,
-    actorAppId: undefined, 
+    actorUserId: viewerId ?? undefined,
+    actorAppId: undefined,
     action: "VIEW_PUBLIC_IDENTITY",
     targetEntityType: "Identity",
     targetEntityId: identity.id,
     outcome: AuditLogOutcome.SUCCESS,
-    details: { source: "page" }, // This is valid Prisma.InputJsonValue
+    details: { source: "explore/[id]" },
   });
 
-  const raw = identity.contextualNameDetails;
   const contextual =
-    typeof raw === "object" &&
-    raw !== null &&
-    "preferredName" in raw &&
-    "usageContext" in raw
-      ? (raw as unknown as { preferredName: string; usageContext: string })
+    typeof identity.contextualNameDetails === "object" &&
+    identity.contextualNameDetails !== null &&
+    "preferredName" in identity.contextualNameDetails &&
+    "usageContext" in identity.contextualNameDetails
+      ? (identity.contextualNameDetails as {
+          preferredName: string;
+          usageContext: string;
+        })
       : { preferredName: "", usageContext: "" };
 
   return (
@@ -64,14 +61,14 @@ export default async function IdentityPage({
           location: identity.location,
           dateOfBirth: identity.dateOfBirth,
           profilePictureUrl: identity.profilePictureUrl,
-          websiteUrls: identity.websiteUrls,
+          websiteUrls: identity.websiteUrls ?? [],
           contextualNameDetails: contextual,
           linkedAccountEmails: identity.linkedExternalAccounts
             .map((a) => a.account.emailFromProvider)
-            .filter((email): email is string => email !== null),
+            .filter((email): email is string => !!email),
           provider: identity.linkedExternalAccounts
             .map((a) => a.account.provider)
-            .filter((provider): provider is string => provider !== null),
+            .filter((provider): provider is string => !!provider),
         }}
       />
     </div>
