@@ -38,26 +38,72 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const identities = await prisma.identity.findMany({
-      where: whereClause,
-      select: {
-        id: true,
-        identityLabel: true,
-        profilePictureUrl: true,
-        category: true,
-        customCategoryName: true, // Useful if category is CUSTOM
-        visibility: true,
-        description: true, // Adding description for more context in listings
-        createdAt: true, // Useful for sorting or display
-        updatedAt: true, // Useful for display
-        // linkedExternalAccounts: { // Example of including related data if needed
-        //   select: { account: { select: { provider: true } } }
-        // }
+    const appId = searchParams.get('appId');
+
+let identities;
+
+if (appId) {
+  console.log(`[GET /api/users/me/identities] Filtering out identities with active consent for appId: ${appId}`);
+
+  // Step 1: Get identity IDs with active consent
+  const consentedIdentityIds = await prisma.consent.findMany({
+    where: {
+      userId,
+      appId,
+      revokedAt: null,
+    },
+    select: { identityId: true },
+  });
+
+  const excludedIds = consentedIdentityIds.map((c) => c.identityId);
+
+  // Step 2: Get all identities not in excluded list
+  identities = await prisma.identity.findMany({
+    where: {
+      ...whereClause,
+      id: {
+        notIn: excludedIds.filter((id) => id !== null),
       },
-      orderBy: {
-        identityLabel: 'asc',
-      },
-    });
+    },
+    select: {
+      id: true,
+      identityLabel: true,
+      profilePictureUrl: true,
+      category: true,
+      customCategoryName: true,
+      visibility: true,
+      description: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+    orderBy: {
+      identityLabel: 'asc',
+    },
+  });
+
+  console.log(`[GET /api/users/me/identities] Found ${identities.length} unconsented identities.`);
+} else {
+  identities = await prisma.identity.findMany({
+    where: whereClause,
+    select: {
+      id: true,
+      identityLabel: true,
+      profilePictureUrl: true,
+      category: true,
+      customCategoryName: true,
+      visibility: true,
+      description: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+    orderBy: {
+      identityLabel: 'asc',
+    },
+  });
+
+  console.log(`[GET /api/users/me/identities] Found ${identities.length} identities with no appId filtering.`);
+}
+
 
     console.log(`[GET /api/users/me/identities] Found ${identities.length} identities for user ${userId} with current filters.`);
     return NextResponse.json(identities);

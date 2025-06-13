@@ -77,7 +77,7 @@ export default function UserAppConsentGranter() {
       setSuccessMessage(null); // Clear previous success messages
       setSelectedIdentityIds([]); // Clear selected identities when app changes
       try {
-        const response = await fetch('/api/users/me/identities?visibility=PRIVATE');
+        const response = await fetch(`/api/users/me/identities?visibility=PRIVATE&appId=${selectedAppId}`);
         if (!response.ok) throw new Error(`Failed to fetch identities: ${response.statusText}`);
         const data: UserPrivateIdentity[] = await response.json();
         setUserPrivateIdentities(data);
@@ -107,32 +107,39 @@ export default function UserAppConsentGranter() {
     setError(null);
     setSuccessMessage(null);
 
+  try {
+    const response = await fetch('/api/users/me/consents/batch-grant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: selectedAppId,
+        identityIds: selectedIdentityIds,
+        scopes: selectedScopes,
+      }),
+    });
+
+    const text = await response.text();
+    let responseData;
     try {
-      const response = await fetch('/api/users/me/consents/batch-grant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          appId: selectedAppId,
-          identityIds: selectedIdentityIds,
-          scopes: selectedScopes,
-        }),
-      });
-      const responseData = await response.json();
-      if (!response.ok) {
-        throw new Error(responseData.error || `Server error: ${response.status}`);
-      }
-      setSuccessMessage(responseData.message || `${selectedIdentityIds.length} consent(s) granted successfully!`);
-      // Optionally reset some selections after success
-      // setSelectedAppId(''); // This would hide the identity list again
-      setSelectedIdentityIds([]);
+      responseData = text ? JSON.parse(text) : {}; // safe fallback
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error during submission.";
-      setError(msg);
-      console.error(msg);
-    } finally {
-      setIsSubmitting(false);
+      throw new Error("Invalid JSON response from server." + err);
     }
-  };
+
+    if (!response.ok) {
+      throw new Error(responseData?.error || `Server error: ${response.status}`);
+    }
+
+    setSuccessMessage(responseData?.message || `${selectedIdentityIds.length} consent(s) granted successfully!`);
+    setSelectedIdentityIds([]);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error during submission.";
+    setError(msg);
+    console.error(msg);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
   
   const selectedAppDetails = connectableApps.find(app => app.id === selectedAppId);
 

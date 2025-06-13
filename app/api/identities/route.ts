@@ -263,3 +263,67 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export async function POST(req: NextRequest) {
+  try {
+    const token = await getToken({ req });
+    if (!token?.sub) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await req.json();
+
+    const {
+      identityLabel,
+      category,
+      customCategoryName,
+      description,
+      contextualNameDetails,
+      identityNameHistory,
+      contextualReligiousNames,
+      genderIdentity,
+      customGenderDescription,
+      pronouns,
+      dateOfBirth,
+      location,
+      profilePictureUrl,
+      identityContacts,
+      onlinePresence,
+      websiteUrls,
+      additionalAttributes,
+      visibility,
+    } = body;
+
+    const identity = await prisma.identity.create({
+      data: {
+        userId: token.sub,
+        identityLabel,
+        category: category as IdentityCategoryType,
+        customCategoryName: customCategoryName || null,
+        description: description || null,
+        contextualNameDetails,
+        identityNameHistory: identityNameHistory ?? [],
+        contextualReligiousNames: contextualReligiousNames ?? [],
+        genderIdentity: genderIdentity || null,
+        customGenderDescription: customGenderDescription || null,
+        pronouns: pronouns || null,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+        location: location || null,
+        profilePictureUrl: profilePictureUrl || null,
+        identityContacts: identityContacts ?? {},
+        onlinePresence: onlinePresence ?? {},
+        websiteUrls: websiteUrls ?? [],
+        additionalAttributes: additionalAttributes ?? {},
+        visibility: visibility as IdentityVisibility,
+      },
+    });
+
+    return NextResponse.json(identity, { status: 201 });
+  } catch (error) {
+    console.error("❌ Error creating identity:", error);
+    return NextResponse.json(
+      { error: "Failed to create identity" },
+      { status: 500 }
+    );
+  }
+}
