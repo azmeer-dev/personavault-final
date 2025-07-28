@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { ConsentRequestStatus } from '@prisma/client';
 import { createAuditLog } from '@/lib/audit'; // Added
 import { AuditActorType, AuditLogOutcome } from '@prisma/client'; // Added
+import { sendNotification } from '@/lib/notifications';
 
 
 const SECRET = process.env.NEXTAUTH_SECRET;
@@ -110,6 +111,18 @@ export async function POST(
         appName: consentRequest.app?.name,
       },
     });
+
+    // Send notification to the requesting user/app owner
+    if (updatedRequest.requestingUserId) {
+      await sendNotification(
+        updatedRequest.requestingUserId,
+        'CONSENT_REQUEST_REJECTED',
+        {
+          consentRequestId: requestId,
+          identityId: updatedRequest.identityId,
+        }
+      );
+    }
 
     return NextResponse.json(updatedRequest);
   } catch (error: unknown) {

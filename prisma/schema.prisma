@@ -31,6 +31,7 @@ model User {
   consentRequestsForUser ConsentRequest[] @relation("TargetUserConsentRequests")
   identities             Identity[]
   sessions               Session[]
+  notifications          Notification[]
 }
 
 model Account {
@@ -280,4 +281,16 @@ enum AuditLogOutcome {
   FAILURE
   ATTEMPT
   PENDING_VERIFICATION
+}
+
+model Notification {
+  id          String    @id @default(cuid())
+  userId      String
+  type        String
+  data        Json
+  read        Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

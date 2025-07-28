@@ -5,6 +5,7 @@ import { getToken } from 'next-auth/jwt';
 import prisma from '@/lib/prisma';
 import { ConsentRequestStatus } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { sendNotification } from '@/lib/notifications';
 
 interface ConsentRequestBody {
   identityId: string;
@@ -127,6 +128,13 @@ export async function POST(req: NextRequest) {
         status: ConsentRequestStatus.PENDING,
         ...(isAppFlow ? { appId: useAppId! } : {}),
       },
+    });
+
+    // Send notification
+    await sendNotification(targetUserId, 'NEW_CONSENT_REQUEST', {
+      consentRequestId: newRequest.id,
+      requester: token.name || 'A user',
+      identity: identityId,
     });
 
     return NextResponse.json(newRequest, { status: 201 });

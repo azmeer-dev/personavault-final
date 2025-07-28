@@ -10,6 +10,7 @@ import {
 } from '@prisma/client';
 import { createAuditLog } from '@/lib/audit';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { sendNotification } from '@/lib/notifications';
 
 const SECRET = process.env.NEXTAUTH_SECRET;
 
@@ -120,6 +121,18 @@ export async function POST(
         consumer: consentRequest.appId ?? consentRequest.requestingUserId,
       },
     });
+
+    // Send notification to the requesting user/app owner
+    if (consentRequest.requestingUserId) {
+      await sendNotification(
+        consentRequest.requestingUserId,
+        'CONSENT_REQUEST_APPROVED',
+        {
+          consentRequestId: requestId,
+          identityId: consentRequest.identityId,
+        }
+      );
+    }
 
     return NextResponse.json(upsertedConsent);
   } catch (err) {

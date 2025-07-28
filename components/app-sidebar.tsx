@@ -16,6 +16,7 @@ import {
 import { NavMain, NavMainItem } from "@/components/nav-main";
 import { NavProjects, NavProject } from "@/components/nav-projects";
 import { NavUser } from "@/components/nav-user";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 import {
   Home as HomeIcon,
@@ -114,6 +115,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 
       {/* Footer */}
       <SidebarFooter>
+        <NotificationBell />
         <NavUser />
       </SidebarFooter>
 

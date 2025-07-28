@@ -7,6 +7,26 @@ jest.mock("next-auth/jwt", () => ({
   getToken: jest.fn(() => Promise.resolve({ sub: "user1" })),
 }));
 
+jest.mock("@prisma/client", () => ({
+  ...jest.requireActual("@prisma/client"),
+  ConsentRequestStatus: {
+    PENDING: "PENDING",
+    APPROVED: "APPROVED",
+    REJECTED: "REJECTED",
+  },
+  AuditActorType: {
+    USER: "USER",
+    APP: "APP",
+    SYSTEM: "SYSTEM",
+  },
+  AuditLogOutcome: {
+    SUCCESS: "SUCCESS",
+    FAILURE: "FAILURE",
+    ATTEMPT: "ATTEMPT",
+    PENDING_VERIFICATION: "PENDING_VERIFICATION",
+  },
+}));
+
 jest.mock("../lib/prisma", () => ({
   __esModule: true,
   default: {
