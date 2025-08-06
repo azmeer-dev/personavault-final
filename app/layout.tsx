@@ -10,6 +10,7 @@ import { ThemeProvider }    from "@/components/theme-provider";
 import SidebarLayout        from "@/components/sidebarLayout";
 import { Toaster }          from "@/components/ui/sonner";
 import ClientOnly from "@/components/ClientOnly";
+import NotificationToaster from "@/components/notifications/NotificationToaster";
 
 export const metadata: Metadata = {
   title:       "PersonaVault",
@@ -40,6 +41,7 @@ export default async function RootLayout({
           >
             {/* pass defaultOpen into your layout */}
             <ClientOnly>
+              <NotificationToaster/>
             <SidebarLayout defaultOpen={defaultOpen}>
               {children}
             </SidebarLayout>

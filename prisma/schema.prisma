@@ -21,34 +21,34 @@ model User {
   updatedAt              DateTime         @updatedAt
   twoFactorSecret        String?
   twoFactorEnabled       Boolean          @default(false)
-
   accounts               Account[]
   ownedApps              App[]
   auditLogEntries        AuditLog[]       @relation("UserAuditLogEntries")
-  consentsGiven          Consent[]        @relation("UserConsents")             // App-to-user consents
-  consentsReceived       Consent[]        @relation("UserConsentsReceived")    // User-to-user consents
+  consentsGiven          Consent[]        @relation("UserConsents")
+  consentsReceived       Consent[]        @relation("UserConsentsReceived")
   consentRequestsByUser  ConsentRequest[] @relation("RequestingUserConsentRequests")
   consentRequestsForUser ConsentRequest[] @relation("TargetUserConsentRequests")
   identities             Identity[]
   sessions               Session[]
+  Notification           Notification[]
 }
 
 model Account {
-  id                 String     @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  emailFromProvider  String?
-  scope              String?
-  access_token       String?
-  expires_at         Int?
-  id_token           String?
-  refresh_token      String?
-  session_state      String?
-  token_type         String?
-  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  identityLinks      IdentityAccount[] // join table
+  id                String            @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  emailFromProvider String?
+  scope             String?
+  access_token      String?
+  expires_at        Int?
+  id_token          String?
+  refresh_token     String?
+  session_state     String?
+  token_type        String?
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  identityLinks     IdentityAccount[]
 
   @@unique([provider, providerAccountId])
   @@index([userId])
@@ -81,14 +81,12 @@ model VerificationToken {
 model IdentityAccount {
   identityId String
   accountId  String
-
+  account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
   identity   Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
-  account    Account  @relation(fields: [accountId],  references: [id], onDelete: Cascade)
 
   @@id([identityId, accountId])
   @@index([accountId])
 }
-
 
 model Identity {
   id                       String               @id @default(cuid())
@@ -152,32 +150,27 @@ model App {
 }
 
 model Consent {
-  id                String    @id @default(cuid())
-  userId            String    // the resource owner (whose identity was shared)
-  appId             String?   // the consuming App, if any
-  requestingUserId  String?   // the consuming User, if any
-  identityId        String?
-  grantedScopes     String[]
-  grantedAt         DateTime  @default(now())
-  lastUsedAt        DateTime?
-  expiresAt         DateTime?
-  revokedAt         DateTime?
+  id               String    @id @default(cuid())
+  userId           String
+  appId            String?
+  identityId       String?
+  grantedScopes    String[]
+  grantedAt        DateTime  @default(now())
+  expiresAt        DateTime?
+  lastUsedAt       DateTime?
+  revokedAt        DateTime?
+  requestingUserId String?
+  app              App?      @relation("AppConsents", fields: [appId], references: [id], onDelete: Cascade)
+  identity         Identity? @relation("IdentityConsents", fields: [identityId], references: [id], onDelete: Cascade)
+  requestingUser   User?     @relation("UserConsents", fields: [requestingUserId], references: [id], onDelete: Cascade)
+  user             User      @relation("UserConsentsReceived", fields: [userId], references: [id], onDelete: Cascade)
 
-  // relations
-  app           App?      @relation("AppConsents",        fields: [appId],            references: [id], onDelete: Cascade)
-  requestingUser User?    @relation("UserConsents",       fields: [requestingUserId], references: [id], onDelete: Cascade)
-  user          User      @relation("UserConsentsReceived", fields: [userId],        references: [id], onDelete: Cascade)
-  identity      Identity? @relation("IdentityConsents",    fields: [identityId],     references: [id], onDelete: Cascade)
-
-  // unique constraints to prevent duplicate grants
-  @@unique([userId, appId,            identityId], name: "UserAppIdentityConsent")
+  @@unique([userId, appId, identityId], name: "UserAppIdentityConsent")
   @@unique([userId, requestingUserId, identityId], name: "UserUserIdentityConsent")
-
   @@index([userId, appId])
   @@index([userId, requestingUserId])
   @@index([identityId])
 }
-
 
 model ConsentRequest {
   id                         String               @id @default(cuid())
@@ -193,7 +186,7 @@ model ConsentRequest {
   expiresAt                  DateTime?
   createdAt                  DateTime             @default(now())
   updatedAt                  DateTime             @updatedAt
-  app                        App?                  @relation("AppConsentRequests", fields: [appId], references: [id], onDelete: Cascade)
+  app                        App?                 @relation("AppConsentRequests", fields: [appId], references: [id], onDelete: Cascade)
   identity                   Identity?            @relation("IdentityConsentRequests", fields: [identityId], references: [id], onDelete: Cascade)
   requestingUser             User?                @relation("RequestingUserConsentRequests", fields: [requestingUserId], references: [id])
   targetUser                 User                 @relation("TargetUserConsentRequests", fields: [targetUserId], references: [id], onDelete: Cascade)
@@ -206,16 +199,15 @@ model AuditLog {
   id               String          @id @default(cuid())
   timestamp        DateTime        @default(now())
   actorType        AuditActorType
-  actorUserId      String?         // foreign key to User
-  actorAppId       String?         // foreign key to App
   action           String
   targetEntityType String?
   targetEntityId   String?
   details          Json?
   outcome          AuditLogOutcome @default(SUCCESS)
-
-  actorApp   App?  @relation("AppAuditLogEntries", fields: [actorAppId], references: [id])
-  actorUser  User? @relation("UserAuditLogEntries", fields: [actorUserId], references: [id])
+  actorAppId       String?
+  actorUserId      String?
+  actorApp         App?            @relation("AppAuditLogEntries", fields: [actorAppId], references: [id])
+  actorUser        User?           @relation("UserAuditLogEntries", fields: [actorUserId], references: [id])
 
   @@index([timestamp])
   @@index([actorType, actorUserId, actorAppId])
@@ -280,4 +272,20 @@ enum AuditLogOutcome {
   FAILURE
   ATTEMPT
   PENDING_VERIFICATION
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  recipientId String
+  type        String
+  title       String
+  message     String
+  link        String?
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  recipient User @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, read])
 }

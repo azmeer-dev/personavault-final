@@ -119,7 +119,7 @@ export function NavUser() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard/notifications"> {/* Standardized path prefix */}
+                    <Link href="/notifications"> {/* Standardized path prefix */}
                       <Bell className="mr-2 h-4 w-4" /> Notifications
                     </Link>
                   </DropdownMenuItem>
