@@ -1,32 +1,32 @@
 /* app/(protectedRoutes)/identities/page.tsx */
-import { getServerSession } from 'next-auth/next';
-import { redirect } from 'next/navigation';
-import { authOptions } from '@/app/api/auth/[...nextauth]/options';
-import prisma from '@/lib/prisma';
+import { getServerSession } from "next-auth/next";
+import { redirect } from "next/navigation";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import prisma from "@/lib/prisma";
 
 import {
   IdentityVisibility,
   IdentityCategoryType,
   ConsentRequestStatus,
-} from '@prisma/client';
+} from "@prisma/client";
 
-import RequestableIdentityCard from '@/components/identity/RequestableIdentityCard';
-import DeleteIdentityButton from '@/components/identity/DeleteIdentityButton';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
+import RequestableIdentityCard from "@/components/identity/RequestableIdentityCard";
+import DeleteIdentityButton from "@/components/identity/DeleteIdentityButton";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
-import type { PublicIdentity, PrivateIdentityStub } from '@/types/identity';
+import type { PublicIdentity, PrivateIdentityStub } from "@/types/identity";
 
 /* ---------- helper ---------- */
 function toCardIdentity(
   row: Awaited<ReturnType<typeof prisma.identity.findMany>>[0] & {
     linkedExternalAccounts: { accountId: string }[];
   },
-  currentUserId: string,
-): ((PublicIdentity | PrivateIdentityStub) & {
+  currentUserId: string
+): (PublicIdentity | PrivateIdentityStub) & {
   userId: string;
   isOwner: boolean;
-}) {
+} {
   const isOwner = row.userId === currentUserId;
 
   if (row.visibility === IdentityVisibility.PRIVATE && !isOwner) {
@@ -35,17 +35,22 @@ function toCardIdentity(
       visibility: row.visibility,
       category: row.category,
       customCategoryName:
-        row.category === IdentityCategoryType.CUSTOM ? row.customCategoryName : null,
-      identityLabel: 'Private Identity',
-      profilePictureUrl: '/img/private-icon.svg',
+        row.category === IdentityCategoryType.CUSTOM
+          ? row.customCategoryName
+          : null,
+      identityLabel: "Private Identity",
+      profilePictureUrl: "/img/private-icon.svg",
       userId: row.userId,
       isOwner,
     };
   }
 
   const cnd =
-    row.contextualNameDetails && typeof row.contextualNameDetails === 'object'
-      ? (row.contextualNameDetails as { preferredName?: string; usageContext?: string })
+    row.contextualNameDetails && typeof row.contextualNameDetails === "object"
+      ? (row.contextualNameDetails as {
+          preferredName?: string;
+          usageContext?: string;
+        })
       : {};
 
   return {
@@ -61,8 +66,8 @@ function toCardIdentity(
     dateOfBirth: row.dateOfBirth ?? null,
     visibility: row.visibility,
     contextualNameDetails: {
-      preferredName: cnd.preferredName ?? '',
-      usageContext: cnd.usageContext ?? '',
+      preferredName: cnd.preferredName ?? "",
+      usageContext: cnd.usageContext ?? "",
     },
     websiteUrls: row.websiteUrls ?? [],
     linkedAccountIds: row.linkedExternalAccounts.map((l) => l.accountId),
@@ -73,7 +78,7 @@ function toCardIdentity(
 
 export default async function IdentitiesPage() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) redirect('/signin');
+  if (!session?.user?.id) redirect("/signin");
   const currentUserId = session.user.id;
 
   /* ---------- supporting data ---------- */
@@ -85,25 +90,38 @@ export default async function IdentitiesPage() {
   /* ---------- identities ---------- */
   const identitiesRaw = await prisma.identity.findMany({
     where: { userId: currentUserId },
-    orderBy: { updatedAt: 'desc' }, // no userId filter → list can include others
+    orderBy: { updatedAt: "desc" }, // no userId filter → list can include others
     include: {
       linkedExternalAccounts: { select: { accountId: true } },
     },
   });
 
-  const identities = identitiesRaw.map((row) => toCardIdentity(row, currentUserId));
+  const identities = identitiesRaw.map((row) =>
+    toCardIdentity(row, currentUserId)
+  );
 
   /* ---------- pending consent requests ---------- */
+  const pendingRequests = await prisma.consentRequest.findMany({
+    where: { requestingUserId: currentUserId },
+    orderBy: { createdAt: "desc" },
+    select: { identityId: true, status: true },
+  });
+
+  // keep only the latest request per identity (skip null identityIds)
+  const latestRequests = pendingRequests.reduce<
+    Record<string, ConsentRequestStatus>
+  >((acc, r) => {
+    if (r.identityId && !(r.identityId in acc)) {
+      acc[r.identityId] = r.status;
+    }
+    return acc;
+  }, {});
+
+  // collect identity IDs whose latest request is still pending
   const pendingIds = new Set(
-    (
-      await prisma.consentRequest.findMany({
-        where: {
-          requestingUserId: currentUserId,
-          status: ConsentRequestStatus.PENDING,
-        },
-        select: { identityId: true },
-      })
-    ).map((r) => r.identityId),
+    Object.entries(latestRequests)
+      .filter(([, status]) => status === ConsentRequestStatus.PENDING)
+      .map(([id]) => id)
   );
 
   /* ---------- UI ---------- */

@@ -1,5 +1,3 @@
-// app/(protectedRoutes)/explore/page.tsx
-
 import { getServerSession } from "next-auth/next";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
@@ -88,7 +86,7 @@ export default async function ExplorePage() {
     select: { id: true, provider: true, emailFromProvider: true },
   });
 
-  const [identitiesRaw, pendingRequests, identityConsents, userConsents] =
+  const [identitiesRaw, allRequests, identityConsents, userConsents] =
     await Promise.all([
       prisma.identity.findMany({
         where: { userId: { not: currentUserId } },
@@ -98,11 +96,9 @@ export default async function ExplorePage() {
         },
       }),
       prisma.consentRequest.findMany({
-        where: {
-          requestingUserId: currentUserId,
-          status: ConsentRequestStatus.PENDING,
-        },
-        select: { identityId: true },
+        where: { requestingUserId: currentUserId },
+        orderBy: { createdAt: "desc" },
+        select: { identityId: true, status: true },
       }),
       prisma.consent.findMany({
         where: {
@@ -122,7 +118,21 @@ export default async function ExplorePage() {
       }),
     ]);
 
-  const pendingIds = new Set(pendingRequests.map((r) => r.identityId));
+  // keep only the latest request per identity
+  const latestByIdentity = new Map<string, typeof allRequests[number]>();
+  for (const req of allRequests) {
+    if (req.identityId && !latestByIdentity.has(req.identityId)) {
+      latestByIdentity.set(req.identityId, req);
+    }
+  }
+
+  // build pendingIds from latest requests only
+  const pendingIds = new Set(
+    Array.from(latestByIdentity.entries())
+      .filter(([, req]) => req.status === ConsentRequestStatus.PENDING)
+      .map(([id]) => id)
+  );
+
   const consentedIdentityIds = new Set(identityConsents.map((c) => c.identityId!));
   const consentedUserIds = new Set(userConsents.map((c) => c.userId));
 
