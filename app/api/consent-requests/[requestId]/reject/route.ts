@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
-import prisma from '@/lib/prisma';
-import { ConsentRequestStatus } from '@prisma/client';
-import { createAuditLog } from '@/lib/audit'; // Added
-import { AuditActorType, AuditLogOutcome } from '@prisma/client'; // Added
-
+import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
+import prisma from "@/lib/prisma";
+import { ConsentRequestStatus } from "@prisma/client";
+import { createAuditLog } from "@/lib/audit"; // Added
+import { AuditActorType, AuditLogOutcome } from "@prisma/client"; // Added
+import { sendNotification } from "@/lib/notifications";
 
 const SECRET = process.env.NEXTAUTH_SECRET;
 
@@ -53,7 +53,8 @@ export async function POST(
     }
 
     if (consentRequest.targetUserId !== userId) {
-      const errorMsg = "Forbidden: You are not the target user for this request";
+      const errorMsg =
+        "Forbidden: You are not the target user for this request";
       await createAuditLog({
         actorType: AuditActorType.USER,
         actorUserId: userId,
@@ -111,6 +112,23 @@ export async function POST(
       },
     });
 
+    const rejectedIdentity = await prisma.identity.findUnique({
+      where: { id: updatedRequest.identityId! },
+      select: { identityLabel: true },
+    });
+
+    const rejectedIdentityLabel =
+      rejectedIdentity?.identityLabel || "an identity";
+
+    await sendNotification({
+      recipientId: updatedRequest.requestingUserId!,
+      title: "Consent Rejected",
+      message: `Your request for "${rejectedIdentityLabel}" has been rejected.`,
+      link: "/dashboard",
+      type: "consent-rejected",
+      sendEmail: true,
+    });
+
     return NextResponse.json(updatedRequest);
   } catch (error: unknown) {
     const auditActorUserId = userId;
@@ -135,6 +153,9 @@ export async function POST(
       });
     }
 
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }
