@@ -84,7 +84,9 @@ export default function ConsentRequestProcessor() {
   const [processingStates, setProcessingStates] = useState<
     Record<string, ProcessingState>
   >({});
-  const [activeTab, setActiveTab] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
+  const [activeTab, setActiveTab] = useState<
+    'PENDING' | 'APPROVED' | 'REJECTED'
+  >('PENDING');
 
   const fetchRequests = useCallback(
     async (status: 'PENDING' | 'APPROVED' | 'REJECTED') => {
@@ -92,7 +94,9 @@ export default function ConsentRequestProcessor() {
       setError(null);
       setRequests([]);
       try {
-        const response = await fetch(`/api/users/me/consent-requests?status=${status}`);
+        const response = await fetch(
+          `/api/users/me/consent-requests?status=${status}`
+        );
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.error || `Failed to fetch: ${response.statusText}`);
@@ -125,9 +129,12 @@ export default function ConsentRequestProcessor() {
     }));
 
     try {
-      const response = await fetch(`/api/consent-requests/${requestId}/${action}`, {
-        method: 'POST',
-      });
+      const response = await fetch(
+        `/api/consent-requests/${requestId}/${action}`,
+        {
+          method: 'POST',
+        }
+      );
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || response.statusText);
       setRequests((prev) => prev.filter((r) => r.id !== requestId));
@@ -168,8 +175,13 @@ export default function ConsentRequestProcessor() {
           const working =
             state?.action === 'approving' || state?.action === 'rejecting';
 
-          const displayName = request.app?.name ?? request.requestingUser?.globalDisplayName ?? request.requestingUser?.legalFullName ??'Unknown';
-          const displayImage = request.app?.logoUrl ?? request.requestingUser?.globalProfileImage ?? undefined;
+          const displayName =
+            request.app?.name ??
+            request.requestingUser?.globalDisplayName ??
+            request.requestingUser?.legalFullName ??
+            'Unknown';
+          const displayImage =
+            request.app?.logoUrl ?? request.requestingUser?.globalProfileImage ?? undefined;
 
           return (
             <Card key={request.id} className="overflow-hidden">
@@ -178,10 +190,7 @@ export default function ConsentRequestProcessor() {
                   {(request.app || request.requestingUser) && (
                     <div className="flex items-center space-x-3">
                       <Avatar className="h-12 w-12 border">
-                        <AvatarImage
-                          src={displayImage}
-                          alt={displayName}
-                        />
+                        <AvatarImage src={displayImage} alt={displayName} />
                         <AvatarFallback>
                           {displayName.substring(0, 2).toUpperCase()}
                         </AvatarFallback>
@@ -227,7 +236,8 @@ export default function ConsentRequestProcessor() {
                 )}
                 {request.contextDescription && (
                   <p className="text-sm">
-                    <strong className="font-medium">Reason:</strong> {request.contextDescription}
+                    <strong className="font-medium">Reason:</strong>{' '}
+                    {request.contextDescription}
                   </p>
                 )}
                 <div>
@@ -261,14 +271,15 @@ export default function ConsentRequestProcessor() {
                   </p>
                 )}
               </CardContent>
-              {activeTab === 'PENDING' && (
-                <CardFooter className="bg-muted/30 p-4 flex flex-col space-y-2">
-                  {state?.error && (
-                    <Alert variant="destructive" className="p-2 text-xs mb-2">
-                      <ShieldAlert className="h-3 w-3 mr-1 inline-block" />
-                      <AlertDescription>{state.error}</AlertDescription>
-                    </Alert>
-                  )}
+              <CardFooter className="bg-muted/30 p-4 flex flex-col space-y-2">
+                {state?.error && (
+                  <Alert variant="destructive" className="p-2 text-xs mb-2">
+                    <ShieldAlert className="h-3 w-3 mr-1 inline-block" />
+                    <AlertDescription>{state.error}</AlertDescription>
+                  </Alert>
+                )}
+                {/* Actions by tab */}
+                {activeTab === 'PENDING' && (
                   <div className="flex flex-col sm:flex-row sm:justify-end sm:space-x-2 space-y-2 sm:space-y-0">
                     <Button
                       variant="outline"
@@ -298,8 +309,43 @@ export default function ConsentRequestProcessor() {
                       Approve
                     </Button>
                   </div>
-                </CardFooter>
-              )}
+                )}
+                {activeTab === 'APPROVED' && (
+                  <div className="flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => processRequest(request.id, 'reject')}
+                      disabled={working}
+                      className="w-full sm:w-auto"
+                    >
+                      {state?.action === 'rejecting' ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <XCircle className="mr-2 h-4 w-4" />
+                      )}
+                      Reject
+                    </Button>
+                  </div>
+                )}
+                {activeTab === 'REJECTED' && (
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      onClick={() => processRequest(request.id, 'approve')}
+                      disabled={working}
+                      className="w-full sm:w-auto"
+                    >
+                      {state?.action === 'approving' ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                      )}
+                      Approve
+                    </Button>
+                  </div>
+                )}
+              </CardFooter>
             </Card>
           );
         })}

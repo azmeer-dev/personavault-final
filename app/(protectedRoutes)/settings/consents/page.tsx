@@ -16,7 +16,7 @@ export default async function ConsentsPage() {
   return (
     <main className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Manage Your Consents</h1>
+        <h1 className="text-3xl font-semibold">Manage App Consents</h1>
         <p className="text-sm text-muted-foreground">
           Review applications and identities you have granted access to your data.
           You can revoke access at any time.

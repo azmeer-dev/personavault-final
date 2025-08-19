@@ -1,5 +1,3 @@
-// app/api/consent-requests/[requestId]/approve/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import prisma from "@/lib/prisma";
@@ -18,17 +16,14 @@ export async function POST(
   req: NextRequest,
   context: { params: Promise<{ requestId: string }> }
 ): Promise<NextResponse> {
-  // 1) Await params
   const { requestId } = await context.params;
 
-  // 2) Authenticate
   const token = await getToken({ req, secret: SECRET });
   if (!token?.sub) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = token.sub;
 
-  // 3) Load the consent request
   const consentRequest = await prisma.consentRequest.findUnique({
     where: { id: requestId },
   });
@@ -41,23 +36,16 @@ export async function POST(
   if (consentRequest.targetUserId !== userId) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (consentRequest.status !== ConsentRequestStatus.PENDING) {
-    return NextResponse.json(
-      { error: `Already ${consentRequest.status.toLowerCase()}` },
-      { status: 400 }
-    );
-  }
 
   const now = new Date();
 
   try {
+    // Create or restore consent when approving
     let upsertedConsent: unknown;
 
     if (consentRequest.appId) {
-      // ── App→User flow ──
       upsertedConsent = await prisma.consent.upsert({
         where: {
-          // use the name of your @@unique([userId, appId, identityId], name: "UserAppIdentityConsent")
           UserAppIdentityConsent: {
             userId,
             appId: consentRequest.appId,
@@ -68,7 +56,6 @@ export async function POST(
           grantedScopes: consentRequest.requestedScopes,
           grantedAt: now,
           revokedAt: null,
-          expiresAt: null,
         },
         create: {
           userId,
@@ -79,10 +66,8 @@ export async function POST(
         },
       });
     } else {
-      // ── User→User flow ──
       upsertedConsent = await prisma.consent.upsert({
         where: {
-          // and this matches @@unique([userId, requestingUserId, identityId], name: "UserUserIdentityConsent")
           UserUserIdentityConsent: {
             userId,
             requestingUserId: consentRequest.requestingUserId!,
@@ -93,7 +78,6 @@ export async function POST(
           grantedScopes: consentRequest.requestedScopes,
           grantedAt: now,
           revokedAt: null,
-          expiresAt: null,
         },
         create: {
           userId,
@@ -105,13 +89,12 @@ export async function POST(
       });
     }
 
-    // 4) Mark the request as approved
+    // Update request status (allow toggling)
     await prisma.consentRequest.update({
       where: { id: requestId },
       data: { status: ConsentRequestStatus.APPROVED, processedAt: now },
     });
 
-    // 5) Audit log
     await createAuditLog({
       actorType: AuditActorType.USER,
       actorUserId: userId,
@@ -125,7 +108,6 @@ export async function POST(
       },
     });
 
-    // 6) Notify requester
     const targetIdentity = await prisma.identity.findUnique({
       where: { id: consentRequest.identityId! },
       select: { identityLabel: true },

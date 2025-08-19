@@ -19,7 +19,7 @@ export default async function MyAppsPage() {
     <main className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="space-y-1">
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">My Applications</h1>
+            <h1 className="text-3xl font-semibold">My Applications</h1>
             <p className="text-sm text-muted-foreground">
                 Manage your registered applications and their settings.
             </p>

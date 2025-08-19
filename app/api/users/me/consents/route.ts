@@ -1,5 +1,3 @@
-// app/api/users/me/consents/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import prisma from '@/lib/prisma';
@@ -13,25 +11,41 @@ export async function GET(req: NextRequest) {
   }
   const userId = token.sub;
 
+  const { searchParams } = new URL(req.url);
+  const appId = searchParams.get('appId') || null;
+
   const consents = await prisma.consent.findMany({
-    where: { userId },
+    where: {
+      userId,
+      revokedAt: null, // only active consents
+      ...(appId ? { appId } : {}), // filter by app if provided
+    },
     include: {
       app: {
-        select: { id: true, name: true, description: true, logoUrl: true, websiteUrl: true },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          logoUrl: true,
+          websiteUrl: true,
+        },
       },
       requestingUser: {
         select: { id: true, globalDisplayName: true },
       },
       identity: {
-        select: { id: true, identityLabel: true, profilePictureUrl: true, category: true },
+        select: {
+          id: true,
+          identityLabel: true,
+          profilePictureUrl: true,
+          category: true,
+        },
       },
     },
     orderBy: { grantedAt: 'desc' },
   });
 
-  // Map to a shape where `app` may be null
   const result = consents.map((c) => {
-    // If this consent was granted to an app:
     if (c.app) {
       return {
         id: c.id,
@@ -47,8 +61,6 @@ export async function GET(req: NextRequest) {
         },
       };
     }
-
-    // Otherwise it was granted to a user:
     if (c.requestingUser) {
       return {
         id: c.id,
@@ -61,8 +73,6 @@ export async function GET(req: NextRequest) {
         },
       };
     }
-
-    // Fallback (shouldn’t happen)
     return {
       id: c.id,
       identity: c.identity,

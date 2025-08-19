@@ -42,12 +42,10 @@ const navDataUser = {
     // { title: "Connected Accounts", url: "/connected-accounts", items: [] },
     { title: "Explore Identities", url: "/explore", items: [] }, // Renamed for clarity
     { title: "My Applications", url: "/my-apps", items: [] },
-    { title: "Pending Requests", url: "/consent-requests", items: [] }, // Updated URL from /consent to /consent-requests
-    { title: "Granted Consents", url: "/settings/consents", items: [] },
+    { title: "Request Manager", url: "/consent-requests", items: [] }, // Updated URL from /consent to /consent-requests
+    // { title: "Manage App Consents", url: "/settings/consents", items: [] },
     { title: "App Permissions", url: "/settings/connected-apps", items: [] },
-    // "API Clients" is not part of the current scope, removed for now if it was a placeholder
-    // { title: "API Clients", url: "/apiClients", items: [] },
-    { title: "Audit Logs", url: "/audit", items: [] },
+    { title: "Audit Logs", url: "/audit-logs", items: [] },
   ],
 };
 // ─────────────────────────────
@@ -67,17 +65,13 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const iconMap: Record<string, LucideIcon> = {
     Home: HomeIcon,
     Dashboard: DashboardIcon,
-    // "Linked Accounts": LinkIcon, // Removed as per navDataUser update
     Identities: Fingerprint,
-    // "API Clients": CodeIcon, // Removed as per navDataUser update
     "Explore Identities": Globe, // Updated icon
     "My Applications": AppWindow,
-    "Pending Requests": MailQuestion, // Updated icon and title
-    "Granted Consents": CheckCheck,
+    "Request Manager": MailQuestion, // Updated icon and title
+    "Manage App Consents": CheckCheck,
     "App Permissions": PlugZap,
     "Audit Logs": FileIcon,
-    // "Settings": SettingsIcon, // If a general settings page existed
-    Test: HomeIcon, // Placeholder, can be removed
   };
 
   // Map your old data into NavMain shape
@@ -100,9 +94,45 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
       {...props}
     >
       {/* Header */}
-      <SidebarHeader className="group-data-[collapsible=icon]:hidden">
+      {/* <SidebarHeader className="group-data-[collapsible=icon]:hidden">
         <Link href="/" className="font-bold px-4 py-2 block">
           PersonaVault
+        </Link>
+      </SidebarHeader> */}
+
+      <SidebarHeader
+        className="
+    flex items-center justify-center transition-all duration-200 ease-linear
+    group-data-[collapsible=offcanvas]:px-4 group-data-[collapsible=offcanvas]:py-2
+    group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center
+  "
+      >
+        <Link
+          href="/"
+          className="
+      font-bold block overflow-hidden relative
+    "
+        >
+          {/* Collapsed PV */}
+          <span
+            className="
+        absolute left-0 right-0 text-center
+        opacity-100 transition-opacity duration-200
+        group-data-[state=expanded]:opacity-0
+      "
+          >
+            PV
+          </span>
+
+          {/* Expanded PersonaVault */}
+          <span
+            className="
+        opacity-0 transition-opacity duration-200 delay-150
+        group-data-[state=expanded]:opacity-100
+      "
+          >
+            PersonaVault
+          </span>
         </Link>
       </SidebarHeader>
 

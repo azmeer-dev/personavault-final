@@ -44,6 +44,7 @@ export default function DashboardPage() {
   }, [status, router]);
 
   /* reusable stat card */
+  /* reusable stat card */
   const StatCard = ({
     title,
     value,
@@ -52,22 +53,20 @@ export default function DashboardPage() {
     title: string;
     value: number | string;
     href?: string;
-  }) => (
-    <Card className="shadow-sm transition-colors hover:ring-2 hover:ring-primary">
-      <CardHeader className="pb-2">
-        {href ? (
-          <Link href={href} className="hover:underline">
-            <CardTitle className="text-base font-medium">{title}</CardTitle>
-          </Link>
-        ) : (
+  }) => {
+    const card = (
+      <Card className="shadow-sm transition-colors hover:ring-2 hover:ring-primary cursor-pointer">
+        <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium">{title}</CardTitle>
-        )}
-      </CardHeader>
-      <CardContent>
-        <span className="text-4xl font-bold">{value}</span>
-      </CardContent>
-    </Card>
-  );
+        </CardHeader>
+        <CardContent>
+          <span className="text-4xl font-bold">{value}</span>
+        </CardContent>
+      </Card>
+    );
+
+    return href ? <Link href={href}>{card}</Link> : card;
+  };
 
   /* skeleton for smoother perceived loading */
   const SkeletonCard = () => (
@@ -116,16 +115,19 @@ export default function DashboardPage() {
                 value={data.accounts}
                 href="/connected-accounts"
               />
-              <StatCard title="Identities" value={data.identities} href="/identities"/>
-              <StatCard title="API Apps" value={data.apps} />
-              <StatCard title="Pending Consents" value={data.pendingConsents} />
+              <StatCard
+                title="Identities"
+                value={data.identities}
+                href="/identities"
+              />
+              <StatCard title="API Apps" value={data.apps} href="/my-apps"/>
+              <StatCard title="Pending Requests" value={data.pendingConsents} href="/consent-requests"/>
               <StatCard
                 title="Audit Logs"
                 value={data.auditLogs}
                 /* span full width on lg */
                 href="/audit-logs"
                 /* col-span handled via parent grid override */
-                
               />
             </>
           )

@@ -15,7 +15,7 @@ export default async function ConsentRequestsPage() {
   return (
     <main className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Pending Consent Requests</h1>
+        <h1 className="text-3xl font-semibold">Request Manager</h1>
         <p className="text-sm text-muted-foreground">
           Review applications and identities requesting access to your data. 
           Approve or reject these requests below.

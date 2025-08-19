@@ -119,7 +119,7 @@ export default async function ExplorePage() {
     ]);
 
   // keep only the latest request per identity
-  const latestByIdentity = new Map<string, typeof allRequests[number]>();
+  const latestByIdentity = new Map<string, (typeof allRequests)[number]>();
   for (const req of allRequests) {
     if (req.identityId && !latestByIdentity.has(req.identityId)) {
       latestByIdentity.set(req.identityId, req);
@@ -133,7 +133,9 @@ export default async function ExplorePage() {
       .map(([id]) => id)
   );
 
-  const consentedIdentityIds = new Set(identityConsents.map((c) => c.identityId!));
+  const consentedIdentityIds = new Set(
+    identityConsents.map((c) => c.identityId!)
+  );
   const consentedUserIds = new Set(userConsents.map((c) => c.userId));
 
   const identities = identitiesRaw.map((row) => {
