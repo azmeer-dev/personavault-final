@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getToken } from "next-auth/jwt";
 
 const supabase = createClient(
-  process.env.SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY! // service role key (server only)
 );
 
