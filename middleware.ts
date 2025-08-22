@@ -16,7 +16,7 @@ export const config = {
     "/dashboard/:path*",
     "/connected-accounts/:path*",
     "/settings/:path*",
-    "/identities/:path*"
+    "/identities/:path*",
   ],
 };
 

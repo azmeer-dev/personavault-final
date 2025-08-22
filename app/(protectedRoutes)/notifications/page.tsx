@@ -58,7 +58,9 @@ export default function NotificationsPage() {
 
   return (
     <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-      <h1 className="text-3xl font-bold mb-6">Your Notifications</h1>
+      <div className="space-y-1">
+            <h1 className="text-3xl font-semibold">Notifications</h1>
+        </div>
 
       {notifications.length === 0 ? (
         <p className="text-muted-foreground">You have no notifications.</p>

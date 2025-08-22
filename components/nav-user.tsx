@@ -114,7 +114,7 @@ export function NavUser() {
                 <DropdownMenuGroup>
                   <DropdownMenuItem asChild>
                     {/* You might want to make this path dynamic or configurable */}
-                    <Link href="/dashboard/settings/account">
+                    <Link href="/settings">
                       <Settings className="mr-2 h-4 w-4" /> Account Settings
                     </Link>
                   </DropdownMenuItem>

@@ -4,9 +4,9 @@ import prisma from '@/lib/prisma';
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }   // params is a Promise in Next 15
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id: consentId } = await params;            // await it once, then use
+  const { id } = await params;
 
   const token = await getToken({ req: request });
   if (!token?.sub) {
@@ -16,7 +16,7 @@ export async function DELETE(
 
   try {
     const consent = await prisma.consent.findUnique({
-      where: { id: consentId },
+      where: { id },
       include: { identity: true },
     });
     if (!consent) {
@@ -36,13 +36,13 @@ export async function DELETE(
     }
 
     await prisma.consent.update({
-      where: { id: consentId },
+      where: { id },
       data: { revokedAt: new Date() },
     });
 
     return NextResponse.json({ message: 'Consent revoked successfully' }, { status: 200 });
   } catch (error) {
-    console.error(`DELETE /consents/${consentId} error:`, error);
+    console.error(`DELETE /consents/${id} error:`, error);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }
