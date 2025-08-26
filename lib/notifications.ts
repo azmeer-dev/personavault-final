@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { sendEmail as sendEmailFunction } from "@/lib/email"; // ✅ Rename the import
-
+import { sendEmail as sendEmailFunction } from "@/lib/email"; 
 type BaseNotifyOptions = {
   recipientId: string;
   title: string;
@@ -16,7 +15,7 @@ export async function sendNotification({
   message,
   link,
   type,
-  sendEmail = true, // ✅ This is now a boolean flag, not a function
+  sendEmail = true,
 }: BaseNotifyOptions) {
   const notification = await prisma.notification.create({
     data: {
