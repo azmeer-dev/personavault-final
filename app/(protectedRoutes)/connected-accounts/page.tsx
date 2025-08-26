@@ -58,7 +58,7 @@ export default async function ConnectedAccountsPage() {
     orderBy: { provider: "asc" },
   });
 
-  const allProviders = ["google", "github", "linkedin", "twitch"] as const;
+  const allProviders = ["google", "github", "twitch"] as const;
 
   return (
     <main className="space-y-8 p-6">

@@ -28,6 +28,7 @@ import {
   CheckCheck, // Added
   PlugZap, // Added
   MailQuestion, // Added
+  Link as LinkIcon
 } from "lucide-react";
 
 const navDataNoUser = {
@@ -38,6 +39,7 @@ const navDataUser = {
     // { title: "Home", url: "/" },
     { title: "Dashboard", url: "/dashboard", items: [] },
     { title: "Identities", url: "/identities", items: [] },
+    { title: "Linked Accounts", url: "/connected-accounts", items: [] },
     // "Connected Accounts" is not part of the current scope, removed for now if it was a placeholder
     // { title: "Connected Accounts", url: "/connected-accounts", items: [] },
     { title: "Explore Identities", url: "/explore", items: [] }, // Renamed for clarity
@@ -67,6 +69,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     Dashboard: DashboardIcon,
     Identities: Fingerprint,
     "Explore Identities": Globe, // Updated icon
+    "Linked Accounts": LinkIcon,
     "My Applications": AppWindow,
     "Request Manager": MailQuestion, // Updated icon and title
     "Manage App Consents": CheckCheck,

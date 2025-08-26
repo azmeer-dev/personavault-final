@@ -14,6 +14,11 @@ import GitHubProvider from "next-auth/providers/github";
 import LinkedInProvider from "next-auth/providers/linkedin";
 import TwitchProvider from "next-auth/providers/twitch";
 import bcrypt from "bcrypt";
+import {
+  GitHubEmail,
+  GitHubProfile,
+  TwitchProfile,
+} from "@/types/providerTypes";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -63,9 +68,42 @@ export const authOptions: NextAuthOptions = {
       allowDangerousEmailAccountLinking: true,
     }),
     GitHubProvider({
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+      clientId: process.env.GITHUB_CLIENT_ID ?? "",
+      clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
+      authorization: { params: { scope: "read:user user:email" } },
       allowDangerousEmailAccountLinking: true,
+      async profile(profile: GitHubProfile, tokens) {
+        let email = profile.email ?? null;
+
+        // Fetch verified primary email if missing
+        if (!email && tokens?.access_token) {
+          try {
+            const res = await fetch("https://api.github.com/user/emails", {
+              headers: {
+                Authorization: `token ${tokens.access_token}`,
+                Accept: "application/vnd.github+json",
+              },
+            });
+
+            if (res.ok) {
+              const emails: GitHubEmail[] = await res.json();
+              const primary = emails.find(
+                (e) => e.primary === true && e.verified === true
+              );
+              if (primary) email = primary.email;
+            }
+          } catch (err) {
+            console.error("Failed to fetch GitHub user emails:", err);
+          }
+        }
+
+        return {
+          id: profile.id.toString(),
+          name: profile.name || profile.login,
+          email,
+          image: profile.avatar_url ?? null,
+        };
+      },
     }),
     LinkedInProvider({
       clientId: process.env.LINKEDIN_CLIENT_ID!,
@@ -73,9 +111,18 @@ export const authOptions: NextAuthOptions = {
       allowDangerousEmailAccountLinking: true,
     }),
     TwitchProvider({
-      clientId: process.env.TWITCH_CLIENT_ID!,
-      clientSecret: process.env.TWITCH_CLIENT_SECRET!,
+      clientId: process.env.TWITCH_CLIENT_ID ?? "",
+      clientSecret: process.env.TWITCH_CLIENT_SECRET ?? "",
+      authorization: { params: { scope: "openid user:read:email" } },
       allowDangerousEmailAccountLinking: true,
+      profile(profile: TwitchProfile) {
+        return {
+          id: profile.sub, // Twitch unique ID
+          name: profile.preferred_username ?? null, // Twitch username
+          email: profile.email ?? null, // requires user:read:email
+          image: profile.picture ?? null, // Twitch avatar
+        };
+      },
     }),
   ],
   callbacks: {
@@ -158,41 +205,60 @@ export const authOptions: NextAuthOptions = {
   },
   events: {
     async linkAccount({ user, account, profile }) {
-      // Added user
-      // only care about Google
-      if (account.provider === "google" && profile?.email) {
-        // Ensure user object and its id are available for linking, might need to fetch if not directly provided
-        // This event runs AFTER a successful sign-in or OAuth link.
-        // The user object here should be the NextAuth user object.
-        if (user && user.id) {
-          await prisma.account.updateMany({
-            // Use updateMany if emailFromProvider is not unique
-            where: {
-              provider: account.provider,
-              providerAccountId: account.providerAccountId,
-              userId: user.id, // Ensure we are updating the correct user's account
-            },
-            data: {
-              emailFromProvider: profile.email,
-            },
-          });
-          // Audit for account linking
-          await createAuditLog({
-            actorType: AuditActorType.USER,
-            actorUserId: user.id,
-            action: "ACCOUNT_LINKED",
-            targetEntityType: "Account",
-            targetEntityId: account.providerAccountId, // Using providerAccountId as a reference
-            outcome: AuditLogOutcome.SUCCESS,
-            details: { provider: account.provider, linkedEmail: profile.email },
-          });
-        } else {
-          console.warn(
-            "Audit Log for linkAccount: User ID not available, skipping audit log for account link."
-          );
-        }
+      if (!user?.id) {
+        console.warn(
+          "Audit Log for linkAccount: User ID not available, skipping audit log."
+        );
+        return;
+      }
+
+      let linkedEmail: string | null = null;
+      let linkedName: string | null = null;
+
+      if (account.provider === "google" && profile && "email" in profile) {
+        linkedEmail = (profile as { email?: string | null }).email ?? null;
+        linkedName =
+          "name" in profile
+            ? (profile as { name?: string | null }).name ?? null
+            : null;
+      } else if (account.provider === "github") {
+        const ghProfile = profile as unknown as GitHubProfile; // safe narrowing
+        linkedEmail = ghProfile.email ?? null;
+        linkedName = ghProfile.name || ghProfile.login;
+      } else if (account.provider === "twitch") {
+        const twitchProfile = profile as unknown as TwitchProfile;
+        linkedEmail = twitchProfile.email ?? null;
+        linkedName = twitchProfile.preferred_username ?? null;
+      }
+
+      if (linkedEmail || linkedName) {
+        await prisma.account.updateMany({
+          where: {
+            provider: account.provider,
+            providerAccountId: account.providerAccountId,
+            userId: user.id,
+          },
+          data: {
+            emailFromProvider: linkedEmail,
+          },
+        });
+
+        await createAuditLog({
+          actorType: AuditActorType.USER,
+          actorUserId: user.id,
+          action: "ACCOUNT_LINKED",
+          targetEntityType: "Account",
+          targetEntityId: account.providerAccountId,
+          outcome: AuditLogOutcome.SUCCESS,
+          details: {
+            provider: account.provider,
+            linkedEmail,
+            linkedName,
+          },
+        });
       }
     },
+
     async signOut({ token }) {
       // token contains JWT payload, session is the client session
       if (token && token.id) {

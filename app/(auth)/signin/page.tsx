@@ -28,7 +28,7 @@ export default function LoginPage() {
     Partial<Record<keyof FormValues, string>>
   >({});
   const [loading, setLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
 
   const update =
     (k: keyof FormValues) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -38,7 +38,6 @@ export default function LoginPage() {
   const handleCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 1) Validate form
     const result = LoginSchema.safeParse(form);
     if (!result.success) {
       const errs: Partial<Record<keyof FormValues, string>> = {};
@@ -52,7 +51,6 @@ export default function LoginPage() {
     setFieldErrors({});
     setLoading(true);
 
-    // 2) Attempt signIn without auto-redirect
     const res = await signIn("credentials", {
       redirect: false,
       callbackUrl: `${window.location.origin}/dashboard`,
@@ -62,22 +60,19 @@ export default function LoginPage() {
 
     setLoading(false);
 
-    // 3) On success → hard redirect
     if (res?.ok && res.url) {
       toast.success("Signed in — welcome back!");
       window.location.href = res.url;
     } else {
-      toast.error(res?.error ?? "Invalid e-mail or password");
+      toast.error("Invalid e-mail or password");
     }
   };
 
-  /* Google OAuth */
-  const handleGoogle = () => {
-    setOauthLoading(true);
-    // show toast
-    toast.success("Signing you in…");
-    // let NextAuth perform its hard redirect
-    signIn("google", {
+  /* generic oauth handler */
+  const handleOAuth = (provider: "google" | "github" | "linkedin" | "twitch") => {
+    setOauthLoading(provider);
+    //toast.success(`Redirecting to ${provider}…`);
+    signIn(provider, {
       callbackUrl: `${window.location.origin}/dashboard`,
     });
   };
@@ -90,18 +85,52 @@ export default function LoginPage() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* OAuth */}
-          <Button
-            onClick={handleGoogle}
-            className="w-full"
-            variant="outline"
-            disabled={oauthLoading}
-            type="button"
-          >
-            {oauthLoading ? "Redirecting…" : "Sign in with Google"}
-          </Button>
+          {/* OAuth buttons */}
+          <div className="space-y-2">
+            <Button
+              onClick={() => handleOAuth("google")}
+              className="w-full"
+              variant="outline"
+              disabled={oauthLoading === "google"}
+              type="button"
+            >
+              {oauthLoading === "google" ? "Redirecting…" : "Sign in with Google"}
+            </Button>
 
-          {/* Credentials */}
+            <Button
+              onClick={() => handleOAuth("github")}
+              className="w-full"
+              variant="outline"
+              disabled={oauthLoading === "github"}
+              type="button"
+            >
+              {oauthLoading === "github" ? "Redirecting…" : "Sign in with GitHub"}
+            </Button>
+
+            {/* <Button
+              onClick={() => handleOAuth("linkedin")}
+              className="w-full"
+              variant="outline"
+              disabled={oauthLoading === "linkedin"}
+              type="button"
+            >
+              {oauthLoading === "linkedin"
+                ? "Redirecting…"
+                : "Sign in with LinkedIn"}
+            </Button> */}
+
+            <Button
+              onClick={() => handleOAuth("twitch")}
+              className="w-full"
+              variant="outline"
+              disabled={oauthLoading === "twitch"}
+              type="button"
+            >
+              {oauthLoading === "twitch" ? "Redirecting…" : "Sign in with Twitch"}
+            </Button>
+          </div>
+
+          {/* Credentials form */}
           <form onSubmit={handleCredentials} noValidate className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
